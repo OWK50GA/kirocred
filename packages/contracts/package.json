@@ -1,0 +1,10 @@
+{
+  "name": "@kirocred/contracts",
+  "version": "1.0.0",
+  "scripts": {
+    "build": "scarb build",
+    "test": "scarb test",
+    "format": "scarb fmt"
+  },
+  "devDependencies": {}
+}

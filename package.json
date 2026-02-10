@@ -1,0 +1,23 @@
+{
+  "name": "kirocred",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces",
+    "build": "npm run build --workspaces",
+    "build:contracts": "cd packages/contracts && scarb build",
+    "test:contracts": "cd packages/contracts && snforge test",
+    "dev:backend": "npm run dev -w @kirocred/backend",
+    "dev:frontend": "npm run dev -w @kirocred/frontend",
+    "test:backend": "npm run test -w @kirocred/backend",
+    "test:frontend": "npm run test -w @kirocred/frontend",
+    "verify-setup": "bash scripts/verify-setup.sh"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "typescript": "^5.9.3"
+  }
+}
