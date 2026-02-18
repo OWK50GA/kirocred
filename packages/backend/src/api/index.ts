@@ -1,3 +1,4 @@
 // REST API module
-// Implementation coming in task 9
-export {};
+export * from "./server";
+export * from "./validation";
+export * from "./routes";

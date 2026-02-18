@@ -1,6 +1,9 @@
 import { PinataSDK } from "pinata";
+import { envConfig } from "../config";
 
-const pinata = new PinataSDK({
-  pinataJwt: "PINATA_JWT",
-  pinataGateway: "example-gateway.mypinata.cloud",
+const { pinataJwt, pinataGatewayUrl } = envConfig;
+
+export const pinata = new PinataSDK({
+  pinataJwt: pinataJwt,
+  pinataGateway: pinataGatewayUrl,
 });
