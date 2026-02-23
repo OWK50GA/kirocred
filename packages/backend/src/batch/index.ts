@@ -8,6 +8,8 @@ import {
   verifyIssuerSignature,
 } from "../crypto/index";
 
+const { starknetRpcUrl } = envConfig;
+
 /**
  * Credential data structure for issuance
  */
@@ -16,7 +18,8 @@ export interface CredentialData {
   holderPublicKey: string;
   attributes: Record<string, any>;
   issuerSignedMessage: string;
-  issuerPublicKey: string;
+  // issuerPublicKey: string;
+  issuerAddress: string | `0x${string}`;
 }
 
 /**
@@ -34,6 +37,8 @@ export interface IssuedCredential {
   attributeSalts: Record<string, string>;
   salt: string;
   attributesHash: string;
+  issuerAddress: string,
+  holderPublicKey: string
 }
 
 /**
@@ -51,8 +56,10 @@ export function issueCredential(
     holderPublicKey,
     attributes,
     issuerSignedMessage,
-    issuerPublicKey,
+    // issuerPublicKey,
+    issuerAddress,
   } = credentialData;
+  // console.log(credentialData);
 
   // Validate input data
   if (
@@ -60,7 +67,7 @@ export function issueCredential(
     !holderPublicKey ||
     !attributes ||
     !issuerSignedMessage ||
-    !issuerPublicKey
+    !issuerAddress
   ) {
     throw new Error("Missing required credential data fields");
   }
@@ -71,7 +78,8 @@ export function issueCredential(
     !verifyIssuerSignature(
       issuerSignedMessage,
       issuerSignedMessage,
-      issuerPublicKey,
+      // issuerPublicKey,
+      issuerAddress as `0x${string}`,
     )
   ) {
     throw new Error("Invalid issuer signature");
@@ -106,6 +114,16 @@ export function issueCredential(
     attributeSalts[key] = generateSalt();
   });
 
+  // console.log("Issued credential: ", {
+  //   credentialId,
+  //   commitment,
+  //   encryptedAttributes,
+  //   encryptedKey,
+  //   attributeSalts,
+  //   salt,
+  //   attributesHash,
+  // });
+
   return {
     credentialId,
     commitment,
@@ -114,6 +132,8 @@ export function issueCredential(
     attributeSalts,
     salt,
     attributesHash,
+    issuerAddress,
+    holderPublicKey
   };
 }
 import {
@@ -138,9 +158,10 @@ export interface BatchMetadata {
  * Batch processing request structure
  */
 export interface BatchProcessingRequest {
-  batchId: string;
+  // batchId: string;
   credentials: CredentialData[];
-  issuerPublicKey: string;
+  // issuerPublicKey: string;
+  issuerAddress: string;
   batchMetadata: BatchMetadata;
 }
 
@@ -168,6 +189,8 @@ export interface CredentialPackage {
 
   // Signatures
   issuerSignedMessage: string; // Issuer's signature
+  issuerAddress: string,
+  holderPublicKey: string
 
   // Salts for selective disclosure
   attributeSalts: Record<string, string>;
@@ -177,7 +200,7 @@ export interface CredentialPackage {
  * Batch processing result structure
  */
 export interface BatchProcessingResult {
-  batchId: string;
+  // batchId: string;
   merkleRoot: string;
   merkleTree: MerkleTree;
   credentialPackages: CredentialPackage[];
@@ -194,18 +217,18 @@ export interface BatchProcessingResult {
 export function processBatch(
   request: BatchProcessingRequest,
 ): BatchProcessingResult {
-  const { batchId, credentials, issuerPublicKey, batchMetadata } = request;
+  const { credentials, issuerAddress, batchMetadata } = request;
 
   // Validate input
-  if (!batchId || !credentials || credentials.length === 0) {
+  if (!credentials || credentials.length === 0) {
     throw new Error(
       "Invalid batch processing request: missing batchId or credentials",
     );
   }
 
-  if (!issuerPublicKey || !batchMetadata) {
+  if (!issuerAddress || !batchMetadata) {
     throw new Error(
-      "Invalid batch processing request: missing issuerPublicKey or batchMetadata",
+      "Invalid batch processing request: missing issuerAddress or batchMetadata",
     );
   }
 
@@ -215,7 +238,7 @@ export function processBatch(
 
   for (const credentialData of credentials) {
     // Ensure issuer public key matches
-    if (credentialData.issuerPublicKey !== issuerPublicKey) {
+    if (credentialData.issuerAddress !== issuerAddress) {
       throw new Error(
         `Credential ${credentialData.credentialId} has mismatched issuer public key`,
       );
@@ -252,12 +275,14 @@ export function processBatch(
       encryptedKey: issuedCredential.encryptedKey,
 
       // Metadata
-      batchId,
+      batchId: "",
       credentialId: issuedCredential.credentialId,
       issuedAt: batchMetadata.timestamp,
 
       // Signatures
       issuerSignedMessage: originalCredential.issuerSignedMessage,
+      issuerAddress: issuedCredential.issuerAddress,
+      holderPublicKey: issuedCredential.holderPublicKey,
 
       // Salts for selective disclosure
       attributeSalts: issuedCredential.attributeSalts,
@@ -267,7 +292,7 @@ export function processBatch(
   }
 
   return {
-    batchId,
+    // batchId,
     merkleRoot,
     merkleTree,
     credentialPackages,
@@ -276,6 +301,8 @@ export function processBatch(
 }
 import { IPFSClient } from "../ipfs/index";
 import { BlockchainClient } from "../blockchain/index";
+import { byteArray, RpcProvider } from "starknet";
+import { envConfig } from "../config";
 
 /**
  * Batch storage and publishing result
@@ -300,26 +327,46 @@ export interface BatchStorageResult {
  * @param orgId - Organization ID for batch creation
  * @returns BatchStorageResult with transaction hash and CIDs
  */
+
+// TODO: Check if you actually need to return issuedCredentials from the object above;
 export async function storeBatchAndPublish(
   batchResult: BatchProcessingResult,
   ipfsClient: IPFSClient,
   blockchainClient: BlockchainClient,
   orgId: number,
 ): Promise<BatchStorageResult> {
-  const { batchId, merkleRoot, credentialPackages } = batchResult;
+  const { merkleRoot, credentialPackages } = batchResult;
+  // console.log("Merkle Root unchanged: ", merkleRoot);
+
+  const provider = new RpcProvider({ nodeUrl: starknetRpcUrl });
 
   try {
     // Store each per-holder package to IPFS (Requirement 2.5, 9.1, 9.2)
     const credentialCIDs: Array<{ credentialId: string; ipfsCid: string }> = [];
 
+    console.log("About to create on Blockchain");
+    const createBatchTxHash = await blockchainClient.createBatch(
+      "BATCH",
+      orgId,
+    );
+    console.log(`Batch created with transaction hash: ${createBatchTxHash}`);
+
+    const batchCreatedEvent = await blockchainClient.readEvent(
+      "BatchCreated",
+      createBatchTxHash,
+    );
+    const batchIdNumber = batchCreatedEvent["batch_id"].toString();
+    console.log(batchIdNumber);
+
     for (const credentialPackage of credentialPackages) {
       try {
         // Store encrypted package to IPFS
+        credentialPackage.batchId = batchIdNumber;
         const ipfsCid = await ipfsClient.storePackage(credentialPackage);
 
         credentialCIDs.push({
           credentialId: credentialPackage.credentialId,
-          ipfsCid,
+          ipfsCid: ipfsCid.cid,
         });
       } catch (error) {
         throw new Error(
@@ -329,24 +376,19 @@ export async function storeBatchAndPublish(
     }
 
     // Create batch on blockchain first
-    const createBatchTxHash = await blockchainClient.createBatch(
-      "BATCH",
-      orgId,
-    );
-    console.log(`Batch created with transaction hash: ${createBatchTxHash}`);
 
     // Publish merkle root and issuer public key to smart contract (Requirement 2.6, 2.7)
     // Note: We need to determine the batch ID from the blockchain
     // For now, we'll use a simple approach - in production, this should be retrieved from the transaction receipt
-    const batchIdNumber = parseInt(batchId.replace(/\D/g, "")) || 1; // Extract number from UUID or use 1
+    // const batchIdNumber = parseInt(batchId.replace(/\D/g, "")) || 1; // Extract number from UUID or use 1
 
     const publishTxHash = await blockchainClient.storeMerkleRoot(
-      batchIdNumber,
+      parseInt(batchIdNumber),
       merkleRoot,
     );
 
     return {
-      batchId,
+      batchId: batchIdNumber,
       merkleRoot,
       transactionHash: publishTxHash,
       credentialCIDs,

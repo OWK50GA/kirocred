@@ -85,7 +85,15 @@ export function getRoot(tree: MerkleTree): string {
     );
   }
 
-  return rootLayer[0];
+  console.log("Merkle root: ", rootLayer[0]);
+  const rawRoot = rootLayer[0];
+  console.log("Raw root: ", rawRoot);
+  const cleanRoot = rawRoot.startsWith('0x') ? rawRoot.slice(2) : rawRoot
+  console.log("Clean root: ", cleanRoot);
+
+  const merkleRoot = cleanRoot.slice(0, 60);
+  console.log("Merkle root: ", merkleRoot);
+  return `0x${merkleRoot}`
 }
 
 /**

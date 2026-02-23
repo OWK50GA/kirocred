@@ -6,14 +6,6 @@ export const KIROCREDABI = [
   },
   {
     type: "enum",
-    name: "kirocred_contracts::types::BatchType",
-    variants: [
-      { name: "BATCH", type: "()" },
-      { name: "SINGLETON", type: "()" },
-    ],
-  },
-  {
-    type: "enum",
     name: "core::bool",
     variants: [
       { name: "False", type: "()" },
@@ -51,7 +43,7 @@ export const KIROCREDABI = [
         type: "function",
         name: "create_batch",
         inputs: [
-          { name: "batch_type", type: "kirocred_contracts::types::BatchType" },
+          { name: "batch_type", type: "core::integer::u8" },
           { name: "org_id", type: "core::integer::u64" },
         ],
         outputs: [],

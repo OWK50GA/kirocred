@@ -4,7 +4,7 @@ pub mod Kirocred {
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_block_timestamp, get_tx_info, get_caller_address};
+    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_tx_info};
     use crate::ikirocred::IKirocredContract;
     use crate::types::{Batch, BatchStatus, BatchType, Organization, OrganizationStatus};
 
@@ -12,6 +12,7 @@ pub mod Kirocred {
     pub struct Storage {
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
+        // TODO -> Change this to map contract address to org_id for more memory efficiency
         pub address_to_org: Map<ContractAddress, Organization>,
         pub id_to_org: Map<u64, Organization>,
         pub next_org_id: u64,
@@ -75,19 +76,15 @@ pub mod Kirocred {
             let tx_info = get_tx_info().unbox();
             batch.onchain_tx = tx_info.transaction_hash;
             batch.issued_at = get_block_timestamp();
-            
+
             // Write the updated batch back to storage
             self.id_to_batch.entry(batch_id).write(batch);
 
             self.emit(MerkleRootStored { root: merkle_root, batch_id });
         }
 
-        fn create_org(
-            ref self: ContractState,
-            // name: felt252,
-            org_address: ContractAddress,
-            org_pubkey: felt252,
-            // contact_email: felt252,
+        fn create_org(ref self: ContractState, // name: felt252,
+        org_address: ContractAddress, org_pubkey: felt252// contact_email: felt252,
         ) {
             let existing_org = self.address_to_org.entry(org_address).read();
             assert(existing_org.org_id == 0, 'Org already exists');
@@ -114,18 +111,24 @@ pub mod Kirocred {
         // Later, things like edit org (permissioned), etc
         // Use verifiable random numbers for this later
         // Orgs should actually have things like description in their backend. Will remove
-        fn create_batch(ref self: ContractState, batch_type: BatchType, org_id: u64) {
+        fn create_batch(ref self: ContractState, batch_type: u8, org_id: u64) {
+            // TODO: Make id generation use a vrf to generate numbers instead
             self.ownable.assert_only_owner();
             let mut org = self.id_to_org.entry(org_id).read();
             let batch_id = self.next_batch_id.read();
             org.batches_count += 1;
+
+            let actual_batch_type = match batch_type {
+                0 => BatchType::BATCH,
+                _ => BatchType::SINGLETON,
+            };
 
             let new_batch = Batch {
                 id: batch_id,
                 org_id,
                 holders: 0,
                 merkle_root: 0,
-                batchType: batch_type,
+                batchType: actual_batch_type,
                 created_at: get_block_timestamp(),
                 issued_at: 0,
                 expires_at: 0,
@@ -160,12 +163,7 @@ pub mod Kirocred {
             let org = self.id_to_org.entry(batch.org_id).read();
             assert(caller == org.issuer_address, 'Only issuer can revoke');
             self.revoked.entry((commitment, batch_id)).write(true);
-            self.emit(
-                CredentialRevoked {
-                    commitment,
-                    batch_id
-                }
-            );
+            self.emit(CredentialRevoked { commitment, batch_id });
         }
 
         fn is_revoked(self: @ContractState, commitment: felt252, batch_id: u64) -> bool {

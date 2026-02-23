@@ -46,9 +46,9 @@ pub enum BatchType {
     BATCH,
     SINGLETON,
     // CONTINUOUS_BATCH,
-    // For this type, (Continuous batch) the merkle root, as well as the path elements and indices,
-    // and data being updated is continuously recomputed. I expect it to be the most often used.
-    // Verify if this method is secure, we designed for batch first, sorry
+// For this type, (Continuous batch) the merkle root, as well as the path elements and indices,
+// and data being updated is continuously recomputed. I expect it to be the most often used.
+// Verify if this method is secure, we designed for batch first, sorry
 }
 
 #[derive(Clone, Drop, Serde, starknet::Store, PartialEq)]
@@ -65,6 +65,7 @@ pub struct Batch {
     pub holders: u64,
     // pub description: ByteArray,
     pub merkle_root: felt252,
+    // pub merkle_root: ByteArray,
     pub batchType: BatchType,
     pub created_at: u64,
     pub issued_at: u64, // started issuing at is more accurate

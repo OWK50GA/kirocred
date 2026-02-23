@@ -6,18 +6,20 @@ export interface IssueCredentialRequest {
   credentialId: string; // UUIDv4
   attributes: Record<string, any>; // Credential attributes
   issuerSignedMessage: string; // Signature from issuer's private key
-  issuerPublicKey: string; // Issuer's public key
+  // issuerPublicKey: string; // Issuer's public key
+  issuerAddress: string;
 }
 
 export interface ProcessBatchRequest {
-  batchId: string; // UUIDv4
+  // batchId: string; // UUIDv4
   credentials: Array<{
     holderPublicKey: string;
     credentialId: string;
     attributes: Record<string, any>;
     issuerSignedMessage: string;
   }>;
-  issuerPublicKey: string; // Issuer's public key for this batch
+  // issuerPublicKey: string; // Issuer's public key for this batch
+  issuerAddress: string;
   batchMetadata: {
     description: string;
     purpose: string;
@@ -76,14 +78,14 @@ export function validateIssueCredentialRequest(data: any): {
   }
 
   if (
-    !data.issuerSignedMessage ||
-    typeof data.issuerSignedMessage !== "string"
+    !data.issuerSignedMessage
+    // || typeof data.issuerSignedMessage !== "string"
   ) {
     errors.push("issuerSignedMessage is required and must be a string");
   }
 
-  if (!data.issuerPublicKey || typeof data.issuerPublicKey !== "string") {
-    errors.push("issuerPublicKey is required and must be a string");
+  if (!data.issuerAddress || typeof data.issuerAddress !== "string") {
+    errors.push("issuerAddress is required and must be a string");
   }
 
   // Validate UUID format for credentialId
@@ -96,8 +98,8 @@ export function validateIssueCredentialRequest(data: any): {
     errors.push("holderPublicKey must be a valid hex string");
   }
 
-  if (data.issuerPublicKey && !isValidHex(data.issuerPublicKey)) {
-    errors.push("issuerPublicKey must be a valid hex string");
+  if (data.issuerAddress && !isValidHex(data.issuerAddress)) {
+    errors.push("issuerAddress must be a valid hex string");
   }
 
   return { isValid: errors.length === 0, errors };
@@ -117,8 +119,8 @@ export function validateProcessBatchRequest(data: any): {
     errors.push("credentials is required and must be an array");
   }
 
-  if (!data.issuerPublicKey || typeof data.issuerPublicKey !== "string") {
-    errors.push("issuerPublicKey is required and must be a string");
+  if (!data.issuerAddress || typeof data.issuerAddress !== "string") {
+    errors.push("issuerAddress is required and must be a string");
   }
 
   if (!data.batchMetadata || typeof data.batchMetadata !== "object") {
@@ -131,8 +133,8 @@ export function validateProcessBatchRequest(data: any): {
   }
 
   // Validate issuer public key hex format
-  if (data.issuerPublicKey && !isValidHex(data.issuerPublicKey)) {
-    errors.push("issuerPublicKey must be a valid hex string");
+  if (data.issuerAddress && !isValidHex(data.issuerAddress)) {
+    errors.push("issuerAddress must be a valid hex string");
   }
 
   // Validate batch metadata
@@ -176,8 +178,9 @@ export function validateProcessBatchRequest(data: any): {
         );
       }
       if (
-        !cred.issuerSignedMessage ||
-        typeof cred.issuerSignedMessage !== "string"
+        !cred.issuerSignedMessage
+        // ||
+        // typeof cred.issuerSignedMessage !== "string"
       ) {
         errors.push(
           `credentials[${index}].issuerSignedMessage is required and must be a string`,

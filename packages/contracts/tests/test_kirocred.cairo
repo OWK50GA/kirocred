@@ -1,11 +1,10 @@
-use starknet::SyscallResultTrait;
 use kirocred_contracts::ikirocred::{IKirocredContractDispatcher, IKirocredContractDispatcherTrait};
-use kirocred_contracts::types::BatchType;
+// use kirocred_contracts::types::BatchType;
 use snforge_std::{
-    ContractClassTrait, DeclareResultTrait, declare,
-    start_cheat_caller_address, stop_cheat_caller_address,
+    ContractClassTrait, DeclareResultTrait, declare, start_cheat_caller_address,
+    stop_cheat_caller_address,
 };
-use starknet::ContractAddress;
+use starknet::{ContractAddress, SyscallResultTrait};
 
 fn owner() -> ContractAddress {
     'owner'.try_into().unwrap()
@@ -38,9 +37,8 @@ fn test_create_organization() {
     start_cheat_caller_address(contract.contract_address, org_address);
     contract.create_org(org_address, org_pubkey);
     stop_cheat_caller_address(contract.contract_address);
-
     // Verify org was created by checking issuer public key retrieval works
-    // (We'd need a get_org function to fully verify, but this tests basic creation)
+// (We'd need a get_org function to fully verify, but this tests basic creation)
 }
 
 #[test]
@@ -72,7 +70,7 @@ fn test_create_batch() {
 
     // Create batch
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_batch(BatchType::BATCH, 1); // org_id = 1
+    contract.create_batch(0, 1); // org_id = 1
     stop_cheat_caller_address(contract.contract_address);
 }
 
@@ -83,7 +81,7 @@ fn test_create_batch_unauthorized() {
     let unauthorized: ContractAddress = get_address('org1');
 
     start_cheat_caller_address(contract.contract_address, unauthorized);
-    contract.create_batch(BatchType::BATCH, 1);
+    contract.create_batch(0, 1);
 }
 
 #[test]
@@ -100,10 +98,10 @@ fn test_store_merkle_root() {
 
     // Create batch
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_batch(BatchType::BATCH, 1);
-    
+    contract.create_batch(0, 1);
+
     // Store merkle root
-    contract.store_merkle_root(1, merkle_root); // batch_id = 1
+    contract.store_merkle_root(1, merkle_root.clone()); // batch_id = 1
     stop_cheat_caller_address(contract.contract_address);
 
     // Verify
@@ -146,7 +144,7 @@ fn test_revoke_credential_by_commitment() {
 
     // Create batch
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_batch(BatchType::BATCH, 1);
+    contract.create_batch(0, 1);
     stop_cheat_caller_address(contract.contract_address);
 
     // Verify not revoked initially
@@ -177,7 +175,7 @@ fn test_revoke_unauthorized() {
 
     // Create batch
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_batch(BatchType::BATCH, 1);
+    contract.create_batch(0, 1);
     stop_cheat_caller_address(contract.contract_address);
 
     // Try to revoke from unauthorized address
@@ -206,7 +204,7 @@ fn test_multiple_commitments_same_batch() {
     stop_cheat_caller_address(contract.contract_address);
 
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_batch(BatchType::BATCH, 1);
+    contract.create_batch(0, 1);
     stop_cheat_caller_address(contract.contract_address);
 
     // Revoke only commitment1
@@ -238,8 +236,8 @@ fn test_full_credential_lifecycle() {
 
     // 2. Create batch
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_batch(BatchType::BATCH, 1);
-    
+    contract.create_batch(0, 1);
+
     // 3. Store merkle root
     contract.store_merkle_root(1, merkle_root);
     stop_cheat_caller_address(contract.contract_address);
@@ -271,10 +269,10 @@ fn test_multiple_batches_same_org() {
 
     // Create multiple batches
     start_cheat_caller_address(contract.contract_address, owner);
-    contract.create_batch(BatchType::BATCH, 1); // batch_id = 1
-    contract.create_batch(BatchType::BATCH, 1); // batch_id = 2
-    contract.create_batch(BatchType::SINGLETON, 1); // batch_id = 3
-    
+    contract.create_batch(0, 1); // batch_id = 1
+    contract.create_batch(0, 1); // batch_id = 2
+    contract.create_batch(1, 1); // batch_id = 3
+
     // Store different roots
     contract.store_merkle_root(1, 'root1');
     contract.store_merkle_root(2, 'root2');
@@ -285,7 +283,7 @@ fn test_multiple_batches_same_org() {
     assert(contract.get_merkle_root(1) == 'root1', 'Batch 1 root mismatch');
     assert(contract.get_merkle_root(2) == 'root2', 'Batch 2 root mismatch');
     assert(contract.get_merkle_root(3) == 'root3', 'Batch 3 root mismatch');
-    
+
     // All should have same issuer pubkey
     assert(contract.get_issuer_public_key(1) == org_pubkey, 'Batch 1 pubkey mismatch');
     assert(contract.get_issuer_public_key(2) == org_pubkey, 'Batch 2 pubkey mismatch');

@@ -1,4 +1,6 @@
 import type { Metadata } from 'next';
+import './globals.css';
+import StarknetProvider from '@/components/StarknetProvider';
 
 export const metadata: Metadata = {
   title: 'Kirocred Verifier',
@@ -12,7 +14,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <StarknetProvider>
+          {children}
+        </StarknetProvider>
+      </body>
     </html>
   );
 }

@@ -1,20 +1,25 @@
 use starknet::ContractAddress;
-use crate::types::BatchType;
+// use crate::types::BatchType;
 
 #[starknet::interface]
 pub trait IKirocredContract<TContractState> {
     // Batch and merkle root storage
-    fn store_merkle_root(ref self: TContractState, batch_id: u64, merkle_root: felt252// issuer_public_key: felt252,
-    // description: felt252,
+    fn store_merkle_root(
+        ref self: TContractState, batch_id: u64, merkle_root: felt252 // issuer_public_key: felt252,
+        // description: felt252,
     // purpose: felt252,
     // issued_by: felt252,
     );
-    fn create_org(ref self: TContractState, // name: felt252,
-    org_address: ContractAddress, org_pubkey: felt252// contact_email: felt252,
+    fn create_org(
+        ref self: TContractState, // name: felt252,
+        org_address: ContractAddress,
+        org_pubkey: felt252 // contact_email: felt252,
     );
     // This is mainly for continuous batches. Batches issued at once will do everything in one
     // function
-    fn create_batch(ref self: TContractState, batch_type: BatchType, org_id: u64);
+    fn create_batch(
+        ref self: TContractState, batch_type: u8, org_id: u64,
+    ); // 0 means BATCH, 1 means singleton
 
     fn get_merkle_root(self: @TContractState, batch_id: u64) -> felt252;
     fn get_issuer_public_key(self: @TContractState, batch_id: u64) -> felt252;

@@ -94,6 +94,7 @@ describe("Crypto Module", () => {
   describe("ECIES Encryption", () => {
     test("encrypt and decrypt key round-trip", () => {
       // Use a valid Starknet private key (smaller than curve order)
+      // This gets a holder private key that we will use to get the full public key
       const privateKey = stark.randomAddress();
       // const publicKey = ec.starkCurve.getStarkKey(privateKey);
       const publicKey = stark.getFullPublicKey(privateKey);
@@ -116,7 +117,11 @@ describe("Crypto Module", () => {
       const messageHash = hash.computeHashOnElements(message);
       const signature = ec.starkCurve.sign(messageHash, privateKey);
 
-      const isValid = verifySignature(messageHash, signature, fullPublicKey);
+      const isValid = verifySignature(
+        messageHash,
+        signature,
+        fullPublicKey as `0x${string}`,
+      );
       expect(isValid).toBe(true);
     });
 
@@ -128,7 +133,11 @@ describe("Crypto Module", () => {
 
       const signature = ec.starkCurve.sign(messageHash, privateKey);
 
-      const isValid = verifyIssuerSignature(messageHash, signature, publicKey);
+      const isValid = verifyIssuerSignature(
+        messageHash,
+        signature,
+        publicKey as `0x${string}`,
+      );
       expect(isValid).toBe(true);
     });
   });

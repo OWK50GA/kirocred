@@ -24,7 +24,14 @@ import { KIROCREDABI } from "../blockchain/abi";
 
 const router = Router();
 
-const { contractAddress, starknetRpcUrl, accountAddress, pinataGatewayUrl, pinataJwt, privateKey } = envConfig;
+const {
+  contractAddress,
+  starknetRpcUrl,
+  accountAddress,
+  pinataGatewayUrl,
+  pinataJwt,
+  privateKey,
+} = envConfig;
 
 // TODO: In production, these should be injected as dependencies or configured via environment
 // For now, we'll create mock instances that throw errors to indicate they need proper configuration
@@ -32,8 +39,8 @@ const { contractAddress, starknetRpcUrl, accountAddress, pinataGatewayUrl, pinat
 const createIPFSClient = (): IPFSClient => {
   const client = new IPFSClient();
 
-  return client
-}
+  return client;
+};
 
 const createBlockChainClient = (): BlockchainClient => {
   const client = new BlockchainClient({
@@ -41,11 +48,11 @@ const createBlockChainClient = (): BlockchainClient => {
     privateKey: privateKey as `0x${string}`,
     rpcUrl: starknetRpcUrl,
     contractAddress: contractAddress as `0x${string}`,
-    contractAbi: KIROCREDABI
-  })
+    contractAbi: KIROCREDABI,
+  });
 
   return client;
-}
+};
 
 // POST /api/credentials/issue endpoint
 router.post(
@@ -63,18 +70,22 @@ router.post(
     }
 
     const requestData: IssueCredentialRequest = req.body;
+    // console.log(req.body)
 
     try {
+      console.log("...trying");
       // Prepare credential data for the batch module
       const credentialData: CredentialData = {
         holderPublicKey: requestData.holderPublicKey,
         credentialId: requestData.credentialId,
         attributes: requestData.attributes,
         issuerSignedMessage: requestData.issuerSignedMessage,
-        issuerPublicKey: requestData.issuerPublicKey,
+        // issuerPublicKey: requestData.issuerPublicKey,
+        issuerAddress: requestData.issuerAddress,
       };
 
       // Call credential issuance function
+      // console.log("Signed message: ", requestData.issuerSignedMessage)
       const issuedCredential = issueCredential(credentialData);
 
       // Return success response
@@ -143,15 +154,17 @@ router.post(
 
       // Prepare batch processing request
       const batchRequest: BatchProcessingRequest = {
-        batchId: requestData.batchId,
+        // batchId: requestData.batchId,
         credentials: requestData.credentials.map((cred) => ({
           holderPublicKey: cred.holderPublicKey,
           credentialId: cred.credentialId,
           attributes: cred.attributes,
           issuerSignedMessage: cred.issuerSignedMessage,
-          issuerPublicKey: requestData.issuerPublicKey,
+          // issuerPublicKey: requestData.issuerPublicKey,
+          issuerAddress: requestData.issuerAddress,
         })),
-        issuerPublicKey: requestData.issuerPublicKey,
+        // issuerPublicKey: requestData.issuerPublicKey,
+        issuerAddress: requestData.issuerAddress,
         batchMetadata: {
           ...requestData.batchMetadata,
           timestamp: Date.now(),

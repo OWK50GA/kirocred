@@ -1,5 +1,9 @@
-import { hash, ec, stark, num, typedData } from "starknet";
+import { hash, ec, stark, num, typedData, RpcProvider } from "starknet";
 import crypto from "crypto";
+import { envConfig } from "../config";
+
+const { starknetRpcUrl } = envConfig;
+const provider = new RpcProvider({ nodeUrl: starknetRpcUrl });
 
 /**
  * Hash credential attributes using keccak256
@@ -213,16 +217,22 @@ export function decryptKeyFromHolder(
  * @returns True if signature is valid, false otherwise
  * Will by typed data: https://starknetjs.com/docs/guides/account/signature/#verify-typeddata-outside-starknet
  */
-export function verifySignature(
+export async function verifySignature(
   messageHash: any,
   signature: any,
-  publicKey: any,
-): boolean {
+  // publicKey: any,
+  accountAddress: `0x${string}`,
+): Promise<boolean> {
   try {
     // const pubKeyHex = publicKey.startsWith('0x') ? publicKey.slice(2) : publicKey;
 
     // Verify using starknet.js verify function
-    const result = ec.starkCurve.verify(signature, messageHash, publicKey);
+    // const result = ec.starkCurve.verify(signature, messageHash, publicKey);
+    const result = await provider.verifyMessageInStarknet(
+      messageHash,
+      signature,
+      accountAddress,
+    );
 
     return result;
   } catch (error) {
@@ -237,12 +247,13 @@ export function verifySignature(
  * @param issuerPublicKey - Issuer's public key
  * @returns True if signature is valid, false otherwise
  */
-export function verifyIssuerSignature(
+export async function verifyIssuerSignature(
   message: string,
   signature: any,
-  issuerPublicKey: string,
-): boolean {
-  return verifySignature(message, signature, issuerPublicKey);
+  // issuerPublicKey: string,
+  issuerAccountAddress: `0x${string}`,
+): Promise<boolean> {
+  return await verifySignature(message, signature, issuerAccountAddress);
 }
 
 export interface UserKeyPair {

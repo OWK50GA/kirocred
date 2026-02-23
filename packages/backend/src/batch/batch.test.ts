@@ -28,17 +28,20 @@ describe("Batch Processing", () => {
           holderPublicKey: holder1.publicKey,
           attributes: { name: "Alice", degree: "CS" },
           issuerSignedMessage: "sig1",
-          issuerPublicKey: "issuer-key",
+          // issuerPublicKey: "issuer-key",
+          issuerAddress: "0x12345678",
         },
         {
           credentialId: "cred-002",
           holderPublicKey: holder2.publicKey,
           attributes: { name: "Bob", degree: "EE" },
           issuerSignedMessage: "sig2",
-          issuerPublicKey: "issuer-key",
+          // issuerPublicKey: "issuer-key",
+          issuerAddress: "0x12345678",
         },
       ],
-      issuerPublicKey: "issuer-key",
+      // issuerPublicKey: "issuer-key",
+      issuerAddress: "0x12345678",
       batchMetadata,
     };
 
@@ -74,7 +77,8 @@ describe("Batch Processing", () => {
     const request: BatchProcessingRequest = {
       batchId: "empty-batch",
       credentials: [],
-      issuerPublicKey: "issuer-key",
+      // issuerPublicKey: "issuer-key",
+      issuerAddress: "0x1234...",
       batchMetadata: {
         description: "Empty batch",
         purpose: "Testing",

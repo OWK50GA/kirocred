@@ -14,6 +14,9 @@ import {
   TransactionReceiptStatus,
   Abi,
   TransactionReceiptValue,
+  GetTransactionReceiptResponse,
+  ParsedEvent,
+  ParsedStruct,
 } from "starknet";
 import { KIROCREDABI } from "./abi";
 
@@ -28,7 +31,7 @@ export interface BlockchainClientConfig {
 export interface TransactionResult {
   transactionHash: string;
   status: TransactionReceiptStatus;
-  value: TransactionReceiptValue
+  value: TransactionReceiptValue;
 }
 
 /**
@@ -39,42 +42,40 @@ export class BlockchainClient {
   private account: Account;
   private contract: Contract;
   private abi: Abi;
+  // private namePrefix: string;
 
   constructor(config: BlockchainClientConfig) {
     // Initialize Starknet provider
     this.provider = new RpcProvider({ nodeUrl: config.rpcUrl });
 
     // Initialize account for transaction signing
-    this.account = new Account(
-      this.provider,
-      config.accountAddress,
-      config.privateKey,
-    );
+    this.account = new Account({
+      provider: this.provider,
+      address: config.accountAddress,
+      signer: config.privateKey,
+    });
 
     this.abi = KIROCREDABI;
 
     // Initialize contract instance
-    this.contract = new Contract(
-      this.abi,
-      config.contractAddress,
-      this.provider,
-    );
-
+    this.contract = new Contract({
+      abi: this.abi,
+      address: config.contractAddress,
+      providerOrAccount: this.provider,
+    });
     // Connect contract to account for transactions
-    this.contract.connect(this.account);
+    // this.contract.connect(this.account);
   }
 
   /**
    * Wait for transaction confirmation and return result
    */
-  private async waitForTransaction(txHash: string): Promise<TransactionResult> {
+  private async waitForTransaction(
+    txHash: string,
+  ): Promise<GetTransactionReceiptResponse> {
     try {
-      const { statusReceipt, value, match } = await this.provider.waitForTransaction(txHash);
-      return {
-        transactionHash: txHash,
-        status: statusReceipt,
-        value,
-      };
+      const receipt = await this.provider.waitForTransaction(txHash);
+      return receipt;
     } catch (error) {
       throw new Error(
         `Transaction failed: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -114,18 +115,26 @@ export class BlockchainClient {
     orgPublicKey: string,
   ): Promise<string> {
     try {
-      const callData = CallData.compile({
+      const callData = new CallData(this.abi).compile("create_org", {
         org_address: orgAddress,
         org_pubkey: this.hexToFelt(orgPublicKey),
       });
 
-      const typedContract = this.contract.typedv2(KIROCREDABI);
+      // const typedContract = this.contract.typedv2(KIROCREDABI);
 
-      const result = typedContract.create_org(callData);
-      // const result = await this.contract.create_org(callData);
-      const txResult = await this.waitForTransaction(result.transaction_hash);
+      // const result = typedContract.create_org(callData);
+      // // const result = await this.contract.create_org(callData);
+      // const txResult = await this.waitForTransaction(result.transaction_hash);
 
-      return txResult.transactionHash;
+      const { transaction_hash } = await this.account.execute([
+        {
+          contractAddress: this.contract.address,
+          calldata: callData,
+          entrypoint: "create_org",
+        },
+      ]);
+
+      return transaction_hash;
     } catch (error) {
       this.handleContractError(error, "Organization creation");
     }
@@ -143,37 +152,65 @@ export class BlockchainClient {
       // Convert batch type to enum value
       const batchTypeValue = batchType === "BATCH" ? 0 : 1;
 
-      const callData = CallData.compile({
+      // const callData = CallData.compile({
+      //   batch_type: batchTypeValue,
+      //   org_id: orgId,
+      // });
+      const calldata = new CallData(this.abi).compile("create_batch", {
         batch_type: batchTypeValue,
         org_id: orgId,
       });
 
-      const typedContract = this.contract.typedv2(KIROCREDABI);
-      const result = typedContract.create_batch(callData);
-      const txResult = await this.waitForTransaction(result.transaction_hash);
+      // const typedContract = this.contract.typedv2(KIROCREDABI);
+      // const result = typedContract.create_batch(callData);
+      // const txResult = await this.waitForTransaction(result.transaction_hash);
 
-      return txResult.transactionHash;
+      const { transaction_hash } = await this.account.execute([
+        {
+          contractAddress: this.contract.address,
+          entrypoint: "create_batch",
+          calldata,
+        },
+      ]);
+      return transaction_hash;
     } catch (error) {
       this.handleContractError(error, "Batch creation");
     }
   }
 
+  hexToBytes(hex: string): Uint8Array {
+    const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
+
+    if (clean.length % 2 !== 0) {
+      throw new Error("Invalid hex string length");
+    }
+
+    return Uint8Array.from(
+      clean.match(/.{2}/g)!.map((byte) => parseInt(byte, 16)),
+    );
+  }
   /**
    * Store merkle root in the smart contract
    * Requirements: 2.6, 7.1, 7.2, 7.3
    */
   async storeMerkleRoot(batchId: number, merkleRoot: string): Promise<string> {
     try {
-      const callData = CallData.compile({
+      const calldata = new CallData(this.abi).compile("store_merkle_root", {
         batch_id: batchId,
-        merkle_root: this.hexToFelt(merkleRoot),
+        merkle_root: merkleRoot,
       });
 
-      const typedContract = this.contract.typedv2(KIROCREDABI);
-      const result = typedContract.store_merkle_root(callData);
-      const txResult = await this.waitForTransaction(result.transaction_hash);
+      console.log("Trying to store merkle root...");
 
-      return txResult.transactionHash;
+      const { transaction_hash } = await this.account.execute([
+        {
+          contractAddress: this.contract.address,
+          calldata,
+          entrypoint: "store_merkle_root",
+        },
+      ]);
+
+      return transaction_hash;
     } catch (error) {
       this.handleContractError(error, "Merkle root storage");
     }
@@ -185,16 +222,24 @@ export class BlockchainClient {
    */
   async revokeCredential(commitment: string, batchId: number): Promise<string> {
     try {
-      const callData = CallData.compile({
+      const calldata = new CallData(this.abi).compile("revoke", {
         commitment: this.hexToFelt(commitment),
         batch_id: batchId,
       });
 
-      const typedContract = this.contract.typedv2(KIROCREDABI);
-      const result = typedContract.revoke(callData);
-      const txResult = await this.waitForTransaction(result.transaction_hash);
+      // const typedContract = this.contract.typedv2(KIROCREDABI);
+      // const result = typedContract.revoke(callData);
+      // const txResult = await this.waitForTransaction(result.transaction_hash);
 
-      return txResult.transactionHash;
+      const { transaction_hash } = await this.account.execute([
+        {
+          contractAddress: this.contract.address,
+          calldata,
+          entrypoint: "revoke",
+        },
+      ]);
+
+      return transaction_hash;
     } catch (error) {
       this.handleContractError(error, "Credential revocation");
     }
@@ -208,7 +253,8 @@ export class BlockchainClient {
     try {
       const typedContract = this.contract.typedv2(KIROCREDABI);
       const result = await typedContract.get_merkle_root(batchId);
-      return num.toHex(result);
+      // Result is a ByteArray, which is returned as a string by starknet.js
+      return result.toString();
     } catch (error) {
       this.handleContractError(error, "Get merkle root");
     }
@@ -242,6 +288,32 @@ export class BlockchainClient {
       return Boolean(result);
     } catch (error) {
       this.handleContractError(error, "Check revocation status");
+    }
+  }
+
+  async readEvent(eventName: string, txHash: string): Promise<ParsedStruct> {
+    try {
+      const receipt = await this.waitForTransaction(txHash);
+
+      // console.log("Receipt: ", receipt);
+
+      const parsed = this.contract.parseEvents(receipt);
+      // console.log("Parsed: ", parsed);
+
+      const parsedKeys = Object.keys(parsed[0]);
+      // console.log("Parsed keys: ", parsedKeys);
+
+      const eventKey = parsedKeys.find(
+        (key) => key.split("::").slice(-1)[0] === eventName,
+      );
+
+      if (!eventKey) throw new Error("No such event found");
+
+      const event = parsed.length ? parsed[0][eventKey] : {};
+      // console.log("Event: ", event);
+      return event;
+    } catch (err) {
+      this.handleContractError(err, "Read event");
     }
   }
 }

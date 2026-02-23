@@ -1,6 +1,6 @@
 import { PinataSDK } from "pinata";
 import crypto from "crypto";
-import { pinata } from "./config"
+import { pinata } from "./config";
 
 /**
  * Encrypted package structure for IPFS storage
@@ -83,23 +83,16 @@ export class IPFSClient {
    * @returns IPFS CID (Content Identifier)
    */
   async storePackage(packageData: any): Promise<{
-    group_id: string,
-    cid: string
+    group_id: string;
+    cid: string;
   }> {
     try {
-      // Encrypt the package before storing
-      const encryptedPackage = this.encryptPackageData(packageData);
-
-      // Upload to IPFS via Pinata
-      // const upload = await (this.pinata.upload as any).json(encryptedPackage);
-      const upload = await this.pinata.upload.public.json(encryptedPackage, {
-        groupId: "some-group-id",
-        
-      })
+      console.log("About to upload pin");
+      const upload = await this.pinata.upload.public.json(packageData);
 
       return {
-        group_id: upload.group_id!,
-        cid: upload.cid
+        group_id: upload.group_id ? upload.group_id : "",
+        cid: upload.cid,
       };
     } catch (error) {
       throw new Error(
