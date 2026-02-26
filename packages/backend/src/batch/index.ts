@@ -59,7 +59,6 @@ export function issueCredential(
   } = credentialData;
   // console.log(credentialData);
 
-  // Validate input data
   if (
     !credentialId ||
     !holderPublicKey ||
@@ -72,6 +71,7 @@ export function issueCredential(
 
   // Verify issuer signature (Requirement 1.4)
   // So what exactly did the issuer sign if the message and the signed message are the same? Flaw
+  // Fixed in another branch. This will be removed when it is fixed
   if (
     !verifyIssuerSignature(
       issuerSignedMessage,
@@ -112,16 +112,6 @@ export function issueCredential(
     attributeSalts[key] = generateSalt();
   });
 
-  // console.log("Issued credential: ", {
-  //   credentialId,
-  //   commitment,
-  //   encryptedAttributes,
-  //   encryptedKey,
-  //   attributeSalts,
-  //   salt,
-  //   attributesHash,
-  // });
-
   return {
     credentialId,
     commitment,
@@ -155,9 +145,7 @@ export interface BatchMetadata {
  * Batch processing request structure
  */
 export interface BatchProcessingRequest {
-  // batchId: string;
   credentials: CredentialData[];
-  // issuerPublicKey: string;
   issuerAddress: string;
   batchMetadata: BatchMetadata;
 }
@@ -364,13 +352,6 @@ export async function storeBatchAndPublish(
       }
     }
 
-    // Create batch on blockchain first
-
-    // Publish merkle root and issuer public key to smart contract (Requirement 2.6, 2.7)
-    // Note: We need to determine the batch ID from the blockchain
-    // For now, we'll use a simple approach - in production, this should be retrieved from the transaction receipt
-    // const batchIdNumber = parseInt(batchId.replace(/\D/g, "")) || 1; // Extract number from UUID or use 1
-
     const publishTxHash = await blockchainClient.storeMerkleRoot(
       parseInt(batchIdNumber),
       merkleRoot,
@@ -412,6 +393,7 @@ export async function storeBatchAndPublish(
   } catch (error) {
     // If any step fails, we should ideally clean up partial state
     // For now, we'll just throw the error
+    // TODO: MAKE THIS AN ALL-OR-NOTHING OR ATOMIC OPERATION -> DYOR
     throw new Error(
       `Batch storage and publishing failed: ${error instanceof Error ? error.message : String(error)}`,
     );

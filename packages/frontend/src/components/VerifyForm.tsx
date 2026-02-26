@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { CompactVerificationPackage } from '@/types/verification';
+import QRScanner from './QRScanner';
 
 interface VerifyFormProps {
   onSubmit: (packageData: CompactVerificationPackage) => void;
@@ -22,6 +23,7 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
   const [isLoadingBatches, setIsLoadingBatches] = useState(false);
   const [selectedBatch, setSelectedBatch] = useState<BatchInfo | null>(null);
   const [showManualInput, setShowManualInput] = useState(false);
+  const [activeTab, setActiveTab] = useState<'manual' | 'scan'>('manual');
 
   // Fetch all batches on mount
   useEffect(() => {
@@ -60,6 +62,29 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
     setShowManualInput(true);
   };
 
+  const handleQRResult = (data: object | string) => {
+    setError(null);
+    try {
+      let jsonString: string;
+      
+      if (typeof data === 'string') {
+        jsonString = data;
+      } else {
+        jsonString = JSON.stringify(data);
+      }
+      
+      setPackageJson(jsonString);
+      // Stay on scan tab to show success, user can switch to manual to see the data
+    } catch (err) {
+      setError('Failed to process QR code data');
+    }
+  };
+
+  const handleQRError = (err: any) => {
+    console.error('QR Scanner error:', err);
+    setError('Camera access denied or unavailable. Please use manual entry.');
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -83,7 +108,7 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
     try {
       const parsedPackage = JSON.parse(packageJson) as CompactVerificationPackage;
 
-      
+
       
       // Basic validation
       const requiredFields = [
@@ -214,31 +239,84 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
 
           <div>
             <p className="text-sm text-gray-400 mb-4">
-              Scan QR code or paste the proof package from the credential holder
+              Enter the proof package from the credential holder
             </p>
             
-            <label className="block text-sm font-medium mb-2 text-white">
-              Upload Proof Package (JSON)
-            </label>
-            <input
-              type="file"
-              accept=".json"
-              onChange={handleFileUpload}
-              className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:transition-colors"
-            />
-          </div>
+            {/* Tabs */}
+            <div className="flex gap-2 mb-4 border-b border-gray-700">
+              <button
+                type="button"
+                onClick={() => setActiveTab('manual')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'manual'
+                    ? 'text-blue-400 border-b-2 border-blue-400'
+                    : 'text-gray-400 hover:text-gray-300'
+                }`}
+              >
+                Manual Entry
+              </button>
+              <button
+                type="button"
+                onClick={() => setActiveTab('scan')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'scan'
+                    ? 'text-blue-400 border-b-2 border-blue-400'
+                    : 'text-gray-400 hover:text-gray-300'
+                }`}
+              >
+                Scan QR Code
+              </button>
+            </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-2 text-white">
-              Or Paste Proof Package JSON
-            </label>
-            <textarea
-              value={packageJson}
-              onChange={(e) => setPackageJson(e.target.value)}
-              placeholder='{"batchId": "1", "commitment": "0x...", "holderSignature": {...}, ...}'
-              rows={15}
-              className="w-full px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-gray-800 text-gray-300 placeholder-gray-500"
-            />
+            {/* Tab Content */}
+            {activeTab === 'manual' ? (
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-white">
+                    Upload Proof Package (JSON)
+                  </label>
+                  <input
+                    type="file"
+                    accept=".json"
+                    onChange={handleFileUpload}
+                    className="block w-full text-sm text-gray-300 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white hover:file:bg-blue-700 file:transition-colors"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2 text-white">
+                    Or Paste Proof Package JSON
+                  </label>
+                  <textarea
+                    value={packageJson}
+                    onChange={(e) => setPackageJson(e.target.value)}
+                    placeholder='{"batchId": "1", "commitment": "0x...", "holderSignature": {...}, ...}'
+                    rows={15}
+                    className="w-full px-3 py-2 border border-gray-700 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm bg-gray-800 text-gray-300 placeholder-gray-500"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-col items-center py-4">
+                <div className="bg-white p-4 rounded-lg">
+                  <QRScanner
+                    onResult={handleQRResult}
+                    onError={handleQRError}
+                    qrbox={250}
+                  />
+                </div>
+                <p className="text-xs text-gray-400 mt-4 text-center">
+                  Position the QR code within the frame to scan
+                </p>
+                {packageJson && (
+                  <div className="mt-4 p-3 bg-green-900/30 border border-green-700/50 rounded-lg">
+                    <p className="text-xs text-green-400 text-center">
+                      ✓ QR code scanned successfully
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {error && (

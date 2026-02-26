@@ -1,8 +1,3 @@
-/* 
-    TODO: Get the abi of the contract, and use the v2 of this so you get ABI
-    typing with abi-wan-kanabi
-*/
-
 import {
   Account,
   Contract,
@@ -42,13 +37,10 @@ export class BlockchainClient {
   private account: Account;
   private contract: Contract;
   private abi: Abi;
-  // private namePrefix: string;
 
   constructor(config: BlockchainClientConfig) {
-    // Initialize Starknet provider
     this.provider = new RpcProvider({ nodeUrl: config.rpcUrl });
 
-    // Initialize account for transaction signing
     this.account = new Account({
       provider: this.provider,
       address: config.accountAddress,
@@ -57,19 +49,13 @@ export class BlockchainClient {
 
     this.abi = KIROCREDABI;
 
-    // Initialize contract instance
     this.contract = new Contract({
       abi: this.abi,
       address: config.contractAddress,
       providerOrAccount: this.provider,
     });
-    // Connect contract to account for transactions
-    // this.contract.connect(this.account);
   }
 
-  /**
-   * Wait for transaction confirmation and return result
-   */
   private async waitForTransaction(
     txHash: string,
   ): Promise<GetTransactionReceiptResponse> {
@@ -90,13 +76,6 @@ export class BlockchainClient {
     const errorMessage =
       error instanceof Error ? error.message : "Unknown error";
     throw new Error(`${operation} failed: ${errorMessage}`);
-  }
-
-  /**
-   * Convert string to felt252 format for Cairo contract calls
-   */
-  private stringToFelt(str: string): string {
-    return cairo.felt(str);
   }
 
   /**
@@ -121,7 +100,6 @@ export class BlockchainClient {
       try {
         const callData = new CallData(this.abi).compile("create_org", {
           org_address: orgAddress,
-          // signature: [signature.r, signature.s],
         });
 
         const { transaction_hash } = await this.account.execute([
@@ -238,7 +216,6 @@ export class BlockchainClient {
     try {
       const typedContract = this.contract.typedv2(KIROCREDABI);
       const result = await typedContract.get_merkle_root(batchId);
-      // Result is a ByteArray, which is returned as a string by starknet.js
       return result.toString();
     } catch (error) {
       this.handleContractError(error, "Get merkle root");

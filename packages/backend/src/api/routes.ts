@@ -69,7 +69,6 @@ router.post(
     }
 
     const requestData: IssueCredentialRequest = req.body;
-    // console.log(req.body)
 
     try {
       console.log("...trying");
@@ -82,7 +81,6 @@ router.post(
       };
 
       // Call credential issuance function
-      // console.log("Signed message: ", requestData.issuerSignedMessage)
       const issuedCredential = issueCredential(credentialData, requestData.issuerAddress);
 
       // Return success response
@@ -160,7 +158,6 @@ router.post(
 
       // Prepare batch processing request
       const batchRequest: BatchProcessingRequest = {
-        // batchId: requestData.batchId,
         credentials: requestData.credentials.map((cred) => ({
           holderPublicKey: cred.holderPublicKey,
           credentialId: cred.credentialId,

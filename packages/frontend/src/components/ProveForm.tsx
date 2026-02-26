@@ -6,6 +6,7 @@ import { deriveEncryptionKeypair, createKeyDerivationTypedData } from '@/lib/enc
 import { ec, hash, num, stark, typedData } from 'starknet';
 import { compressPublicKey, hexToUint8Array, normalizeAddress, starkKeyToFullPublicKey } from '@/lib/utils';
 import { feltToHex } from '@/lib/verification';
+import QRGenerator from './QRGenerator';
 
 interface CredentialInfo {
   credentialId: string;
@@ -30,6 +31,7 @@ export default function ProveForm() {
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
   const [selectedCredential, setSelectedCredential] = useState<CredentialInfo | null>(null);
   const [isLoadingPackage, setIsLoadingPackage] = useState(false);
+  const [activeTab, setActiveTab] = useState<'qr' | 'manual'>('qr');
 
   const { address, isConnected } = useAccount();
   const { signTypedDataAsync } = useSignTypedData({});
@@ -379,14 +381,49 @@ export default function ProveForm() {
           <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
             <h3 className="text-sm font-semibold mb-3 text-white">Proof Package Ready</h3>
             <p className="text-xs text-gray-400 mb-3">
-              Share this proof package with the verifier (QR code generation coming soon)
+              Share this proof package with the verifier via QR code or manual entry
             </p>
-            <textarea
-              value={proofPackage}
-              readOnly
-              rows={15}
-              className="w-full px-3 py-2 border border-gray-700 rounded-lg bg-gray-900 font-mono text-sm text-gray-300"
-            />
+            
+            {/* Tabs */}
+            <div className="flex gap-2 mb-4 border-b border-gray-700">
+              <button
+                onClick={() => setActiveTab('qr')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'qr'
+                    ? 'text-blue-400 border-b-2 border-blue-400'
+                    : 'text-gray-400 hover:text-gray-300'
+                }`}
+              >
+                QR Code
+              </button>
+              <button
+                onClick={() => setActiveTab('manual')}
+                className={`px-4 py-2 text-sm font-medium transition-colors ${
+                  activeTab === 'manual'
+                    ? 'text-blue-400 border-b-2 border-blue-400'
+                    : 'text-gray-400 hover:text-gray-300'
+                }`}
+              >
+                Manual Entry
+              </button>
+            </div>
+
+            {/* Tab Content */}
+            {activeTab === 'qr' ? (
+              <div className="flex flex-col items-center py-4">
+                <QRGenerator payload={proofPackage} size={300} />
+                <p className="text-xs text-gray-400 mt-4 text-center">
+                  Scan this QR code with the verifier's device
+                </p>
+              </div>
+            ) : (
+              <textarea
+                value={proofPackage}
+                readOnly
+                rows={15}
+                className="w-full px-3 py-2 border border-gray-700 rounded-lg bg-gray-900 font-mono text-sm text-gray-300"
+              />
+            )}
           </div>
 
           <div className="flex gap-2">

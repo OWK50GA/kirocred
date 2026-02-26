@@ -29,17 +29,17 @@ export function RoleCard({
       <div
         className={cn(
           'relative group h-full p-8 rounded-xl border transition-all duration-300',
-          'bg-gradient-to-br hover:shadow-lg hover:shadow-[#00D9FF]/20',
+          'bg-linear-to-br hover:shadow-lg hover:shadow-[#00D9FF]/20',
           'cursor-pointer overflow-hidden',
           colorClasses[color]
         )}
       >
         {/* Animated background gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-transparent via-[#00D9FF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="absolute inset-0 bg-linear-to-br from-transparent via-[#00D9FF]/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         <div className="relative z-10 flex flex-col gap-4">
           {/* Icon */}
-          <div className="w-16 h-16 rounded-lg bg-gradient-to-br from-[#00D9FF]/30 to-[#A855F7]/20 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform duration-300">
+          <div className="w-16 h-16 rounded-lg bg-linear-to-br from-[#00D9FF]/30 to-[#A855F7]/20 flex items-center justify-center text-3xl group-hover:scale-110 transition-transform duration-300">
             {icon}
           </div>
 

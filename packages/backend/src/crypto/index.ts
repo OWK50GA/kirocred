@@ -224,10 +224,6 @@ export async function verifySignature(
   accountAddress: `0x${string}`,
 ): Promise<boolean> {
   try {
-    // const pubKeyHex = publicKey.startsWith('0x') ? publicKey.slice(2) : publicKey;
-
-    // Verify using starknet.js verify function
-    // const result = ec.starkCurve.verify(signature, messageHash, publicKey);
     const result = await provider.verifyMessageInStarknet(
       messageHash,
       signature,
@@ -277,10 +273,8 @@ export function generateUserKeyPair(): UserKeyPair {
 }
 
 export function hexToUint8Array(hexString: string): Uint8Array {
-  // Remove 0x prefix if present
   const hex = hexString.startsWith("0x") ? hexString.slice(2) : hexString;
 
-  // Create Uint8Array from hex string
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
     bytes[i / 2] = parseInt(hex.substr(i, 2), 16);

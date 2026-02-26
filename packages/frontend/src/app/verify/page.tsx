@@ -63,7 +63,7 @@ export default function VerifyPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-black via-black to-black/80">
+    <div className="min-h-screen bg-linear-to-b from-black via-black to-black/80">
       <Header currentPage="verify" />
 
       <section className="px-6 py-12">

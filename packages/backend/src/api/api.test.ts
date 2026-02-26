@@ -1,6 +1,6 @@
 import request from "supertest";
 import { createServer, setupErrorHandling } from "./server";
-import { router } from "./routes";
+import router from "./routes";
 
 describe("API Endpoints", () => {
   let app: any;
