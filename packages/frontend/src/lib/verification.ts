@@ -133,7 +133,7 @@ export function verifyMerkleProof(
       console.log("Single leaf tree - Leaf:", leaf);
       console.log("Expected root (original):", expectedRoot);
       console.log("Expected root (hex):", expectedRootHex);
-      return leaf === expectedRootHex;
+      return truncateBit256(leaf) === expectedRootHex;
     }
     
     let currentHash = leaf;
@@ -156,6 +156,7 @@ export function verifyMerkleProof(
     // const slicedCleanCalculatedHash = cleanCalculatedHash.slice(0, 60);
     // const calculatedHash = `0x${slicedCleanCalculatedHash}`;
     const calculatedHash = truncateBit256(currentHash);
+    console.log("Calculated root: ", calculatedHash)
 
     // console.log("Calculated root:", calculatedHash);
     // console.log("Expected root (original):", expectedRoot);
@@ -234,6 +235,7 @@ export function verifyHolderSignature(
     // Verify the signature against the message hash
     console.log("Holder Public Key: ", holderPublicKey);
     console.log("Signature b4 fnxn: ", signature)
+    console.log("MessageHash: ", messageHash);
     return verifySignature(messageHash, signature, holderPublicKey);
   } catch (error) {
     console.error('Error verifying holder signature:', error);

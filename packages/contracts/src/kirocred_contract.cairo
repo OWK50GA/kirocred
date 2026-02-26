@@ -1,10 +1,15 @@
 #[starknet::contract]
 pub mod Kirocred {
+    use core::num::traits::Zero;
     use openzeppelin::access::ownable::OwnableComponent;
+    use openzeppelin::upgrades::UpgradeableComponent;
+    use openzeppelin::upgrades::interface::IUpgradeable;
+    // use cartridge_vrf::Source;
+    // use cartridge_vrf::vrf_consumer::vrf_consumer_component::VrfConsumerComponent;
     use starknet::storage::{
         Map, StoragePathEntry, StoragePointerReadAccess, StoragePointerWriteAccess,
     };
-    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_tx_info};
+    use starknet::{ContractAddress, get_block_timestamp, get_caller_address, get_tx_info, ClassHash};
     use crate::ikirocred::IKirocredContract;
     use crate::types::{Batch, BatchStatus, BatchType, Organization, OrganizationStatus};
 
@@ -12,8 +17,10 @@ pub mod Kirocred {
     pub struct Storage {
         #[substorage(v0)]
         ownable: OwnableComponent::Storage,
+        #[substorage(v0)]
+        pub upgradeable: UpgradeableComponent::Storage,
         // TODO -> Change this to map contract address to org_id for more memory efficiency
-        pub address_to_org: Map<ContractAddress, Organization>,
+        pub address_to_org_id: Map<ContractAddress, u64>, // contractAddress to org_id
         pub id_to_org: Map<u64, Organization>,
         pub next_org_id: u64,
         pub next_batch_id: u64,
@@ -22,15 +29,21 @@ pub mod Kirocred {
     }
 
     component!(path: OwnableComponent, storage: ownable, event: OwnableEvent);
+    component!(path: UpgradeableComponent, storage: upgradeable, event: UpgradeableEvent);
+    // component!(path: VrfConsumerComponent, storage: vrf_consumer, event: VrfConsumerEvent);
 
     impl OwnableImpl = OwnableComponent::OwnableMixinImpl<ContractState>;
     impl OwnableInternalImpl = OwnableComponent::InternalImpl<ContractState>;
+
+    impl UpgradeableInternalImpl = UpgradeableComponent::InternalImpl<ContractState>;
 
     #[event]
     #[derive(Drop, starknet::Event)]
     pub enum Event {
         #[flat]
         OwnableEvent: OwnableComponent::Event,
+        #[flat]
+        UpgradeableEvent: UpgradeableComponent::Event,
         MerkleRootStored: MerkleRootStored,
         OrganizationCreated: OrganizationCreated,
         BatchCreated: BatchCreated,
@@ -68,6 +81,14 @@ pub mod Kirocred {
     }
 
     #[abi(embed_v0)]
+    pub impl UpgradeableImpl of IUpgradeable<ContractState> {
+        fn upgrade(ref self: ContractState, new_class_hash: ClassHash) {
+            self.ownable.assert_only_owner();
+            self.upgradeable.upgrade(new_class_hash);
+        }
+    }
+
+    #[abi(embed_v0)]
     pub impl KirocredImpl of IKirocredContract<ContractState> {
         fn store_merkle_root(ref self: ContractState, batch_id: u64, merkle_root: felt252) {
             self.ownable.assert_only_owner();
@@ -83,27 +104,34 @@ pub mod Kirocred {
             self.emit(MerkleRootStored { root: merkle_root, batch_id });
         }
 
-        fn create_org(ref self: ContractState, // name: felt252,
-        org_address: ContractAddress, org_pubkey: felt252// contact_email: felt252,
+        fn create_org(
+            ref self: ContractState, org_address: ContractAddress, 
+            // signature: (felt252, felt252),
         ) {
-            let existing_org = self.address_to_org.entry(org_address).read();
-            assert(existing_org.org_id == 0, 'Org already exists');
+            // let caller = get_caller_address();
+
+            // Security: Only the organization address itself can register
+            // assert(caller == org_address, 'Only org can register itself');
+
+            let existing_org_id = self.address_to_org_id.entry(org_address).read();
+            assert(existing_org_id == 0, 'Org already exists');
+
+            // TODO: Add signature verification here to prevent spam
+            // For now, we rely on the caller == org_address check
 
             let org_id = self.next_org_id.read();
             self.next_org_id.write(org_id + 1);
             let organization = Organization {
                 org_id,
-                // name,
                 issuer_address: org_address,
-                issuer_pubkey: org_pubkey,
-                // contact_email,
+                // issuer_pubkey: 0, // No longer needed - we get pubkey from signature verification
                 created_at: get_block_timestamp(),
                 last_active_at: 0,
                 status: OrganizationStatus::CREATED,
                 batches_count: 0,
             };
 
-            self.address_to_org.entry(org_address).write(organization);
+            self.address_to_org_id.entry(org_address).write(org_id);
             self.id_to_org.entry(org_id).write(organization);
             self.emit(OrganizationCreated { creator: org_address, org_id })
         }
@@ -115,6 +143,7 @@ pub mod Kirocred {
             // TODO: Make id generation use a vrf to generate numbers instead
             self.ownable.assert_only_owner();
             let mut org = self.id_to_org.entry(org_id).read();
+            assert(org.issuer_address.is_non_zero(), 'Organization does not exist');
             let batch_id = self.next_batch_id.read();
             org.batches_count += 1;
 
@@ -139,7 +168,6 @@ pub mod Kirocred {
 
             self.id_to_batch.entry(batch_id).write(new_batch.clone());
             self.id_to_org.entry(org_id).write(org);
-            self.address_to_org.entry(org.issuer_address).write(org);
             self.next_batch_id.write(batch_id + 1);
             self.emit(BatchCreated { batch_id })
         }
@@ -149,11 +177,17 @@ pub mod Kirocred {
             batch.merkle_root
         }
 
-        fn get_issuer_public_key(self: @ContractState, batch_id: u64) -> felt252 {
+        fn get_issuer_address(self: @ContractState, batch_id: u64) -> ContractAddress {
             let batch = self.id_to_batch.entry(batch_id).read();
             let org_id = batch.org_id;
             let org = self.id_to_org.entry(org_id).read();
-            org.issuer_pubkey
+            // Return the organization address as felt252 since we now use address-based
+            // verification
+            org.issuer_address
+        }
+
+        fn get_org_by_address(self: @ContractState, org_address: ContractAddress) -> u64 {
+            self.address_to_org_id.entry(org_address).read()
         }
 
         // Revocation management

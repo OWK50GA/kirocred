@@ -5,7 +5,8 @@ import {
   verifyMerkleProof,
   generateNonce,
   verifyHolderSignature,
-  validateNonce
+  validateNonce,
+  feltToHex
 } from './verification';
 import {
   VerificationRequest,
@@ -15,7 +16,7 @@ import {
 } from '@/types/verification';
 import { StarknetClient } from './starknet';
 import { truncateBit256 } from './utils';
-import { typedData } from 'starknet';
+import { ec, typedData, WeierstrassSignatureType } from 'starknet';
 
 /**
  * Main credential verification function
@@ -59,7 +60,17 @@ export async function verifyCredential(
       return createFailureResult(checks, batchMetadata, errors, request.disclosedAttributes);
     }
     
-    // Step 1: Verify holder signature on nonce (with encryption public key)
+    // Step 1: Fetch issuer address from blockchain using batch ID
+    let issuerAddress: string;
+    try {
+      issuerAddress = await starknetClient.getIssuerAddress(batchId);
+      console.log('Fetched issuer address:', issuerAddress);
+    } catch (error) {
+      errors.push(`Failed to fetch issuer address: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      return createFailureResult(checks, batchMetadata, errors, request.disclosedAttributes);
+    }
+    
+    // Step 2: Verify holder signature on nonce (with encryption public key)
     // This proves the holder possesses the encryption private key and is actively participating
     try {
       // Validate nonce format
@@ -68,17 +79,19 @@ export async function verifyCredential(
         errors.push('Invalid nonce format');
       }
 
-      checks.holderSignatureValid = verifyHolderSignature(
-        request.messageHash,
-        request.holderSignature,
-        request.holderEncryptionPublicKey
-      )
+      // console.log(request.holderSignature, request.messageHash, request.holderEncryptionPublicKey);
+
+      // console.log("Acc Sig: ", accSig)
+      const bool = ec.starkCurve.verify(request.holderSignature, request.messageHash, request.holderEncryptionPublicKey);
+      console.log(bool);
+
+      checks.holderSignatureValid = bool;
 
     } catch (error) {
       errors.push(`Failed to verify holder signature: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
-    // Step 2: Verify issuer signature
+    // Step 3: Verify issuer signature
     // Note: The issuerSignedMessage needs to be parsed to extract the actual signature
     // For now, we'll skip this check as the signature format needs clarification
     try {
@@ -92,29 +105,29 @@ export async function verifyCredential(
       errors.push(`Failed to verify issuer signature: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
     
-    // Step 3: Fetch merkle root from blockchain
+    // Step 4: Fetch merkle root from blockchain
     let merkleRoot: string;
     try {
       merkleRoot = await starknetClient.getMerkleRoot(batchId);
-      console.log('Fetched merkle root:', merkleRoot);
+      console.log('Fetched merkle root:', feltToHex(BigInt(merkleRoot)));
     } catch (error) {
       errors.push(`Failed to fetch merkle root: ${error instanceof Error ? error.message : 'Unknown error'}`);
       return createFailureResult(checks, batchMetadata, errors, request.disclosedAttributes);
     }
     
-    // Step 4: Verify merkle proof
+    // Step 5: Verify merkle proof
     checks.merkleProofValid = verifyMerkleProof(
       request.commitment,
       request.pathElements,
       request.pathIndices,
-      merkleRoot
+      feltToHex(BigInt(merkleRoot))
     );
     
     if (!checks.merkleProofValid) {
       errors.push('Merkle proof verification failed - credential not in batch');
     }
     
-    // Step 5: Check revocation status
+    // Step 6: Check revocation status
     try {
       const isRevoked = await starknetClient.isRevoked(truncateBit256(request.commitment), batchId);
       checks.notRevoked = !isRevoked;
@@ -127,11 +140,11 @@ export async function verifyCredential(
     }
     
     // TODO: Fetch actual batch metadata from blockchain or IPFS
-    // For now, use placeholder
+    // For now, use placeholder with fetched issuer address
     batchMetadata = {
       description: `Batch ${batchId}`,
       purpose: 'Credential verification',
-      issuedBy: request.issuerAddress,
+      issuedBy: issuerAddress,
       timestamp: Date.now() / 1000,
     };
     
@@ -204,7 +217,7 @@ export async function verifyCredentialPackage(
     pathElements: packageData.pathElements,
     pathIndices: packageData.pathIndices,
     issuerSignedMessage: packageData.issuerSignedMessage,
-    issuerAddress: packageData.issuerAddress,
+    // issuerAddress is now fetched from blockchain using batchId
     holderSignature: packageData.holderSignature,
     holderEncryptionPublicKey: packageData.holderPublicKey,
     nonce: packageData.nonce,

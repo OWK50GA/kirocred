@@ -1,7 +1,9 @@
 // Encryption key derivation from wallet signatures
 // This allows holders to derive a deterministic encryption keypair from their wallet
 
-import { ec, stark } from 'starknet';
+import { ec, hash, stark, TypedData } from 'starknet';
+import { feltToHex } from './verification';
+import { hexToUint8Array } from './utils';
 
 /**
  * Derive encryption keypair from a Starknet wallet signature
@@ -22,20 +24,25 @@ export function deriveEncryptionKeypair(signature: string[] | { r: string; s: st
   // Extract r component from signature
   let r: string;
   if (Array.isArray(signature)) {
-    r = signature[0];
+
+    if (signature.length === 3) {
+      r = signature[1];
+    } else if (signature.length === 9) {
+      r = signature[2];
+    } else {
+      return { privateKey: "0", publicKey: "0" }
+    }
   } else {
     r = signature.r;
   }
+
+  const hexR = feltToHex(BigInt(r))
   
-  // Remove 0x prefix if present
-  const privateKeyHex = r.startsWith('0x') ? r.slice(2) : r;
-  
-  // Derive public key from private key using Stark curve
-  const fullPublicKey = stark.getFullPublicKey(privateKeyHex);
+  const fullPubKey = stark.getFullPublicKey(hexR)
   
   return {
-    privateKey: privateKeyHex,
-    publicKey: fullPublicKey,
+    privateKey: hexR,
+    publicKey: fullPubKey,
   };
 }
 
@@ -59,7 +66,7 @@ export function getKeyDerivationMessage(): string {
  * 
  * @returns TypedData object for wallet signing
  */
-export function createKeyDerivationTypedData() {
+export function createKeyDerivationTypedData(): TypedData {
   const message = getKeyDerivationMessage();
   
   return {

@@ -1,6 +1,6 @@
 // Starknet provider configuration for blockchain queries
 
-import { Provider, Contract, num } from 'starknet';
+import { Provider, Contract, num, BigNumberish } from 'starknet';
 import { KIROCREDABI } from './abi';
 
 export class StarknetClient {
@@ -45,15 +45,34 @@ export class StarknetClient {
     }
   }
   /**
-   * Get issuer public key for a batch
+   * Get issuer address for a batch (returns organization address as hex)
    */
-  async getIssuerPublicKey(batchId: number): Promise<string> {
+  async getIssuerAddress(batchId: number): Promise<string> {
     try {
-      const result = await this.contract.get_issuer_public_key(batchId);
+      const typedContract = this.contract.typedv2(KIROCREDABI);
+      const result = await typedContract.get_issuer_address(batchId);
       return num.toHex(result);
     } catch (error) {
-      throw new Error(`Failed to get issuer public key for batch ${batchId}: ${error}`);
+      throw new Error(`Failed to get issuer address for batch ${batchId}: ${error}`);
     }
+  }
+
+  async getOrgByAddress(address: string): Promise<BigNumberish> {
+    try {
+      const typedContract = this.contract.typedv2(KIROCREDABI);
+      const result = await typedContract.get_org_by_address(address);
+      return result
+    } catch (err) {
+      throw new Error(`Failed to get org for address ${address}`);
+    }
+  }
+
+  /**
+   * Get issuer public key for a batch (deprecated - now returns issuer address)
+   * @deprecated Use getIssuerAddress instead
+   */
+  async getIssuerPublicKey(batchId: number): Promise<string> {
+    return this.getIssuerAddress(batchId);
   }
 
   /**

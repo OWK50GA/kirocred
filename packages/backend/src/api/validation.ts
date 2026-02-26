@@ -8,6 +8,7 @@ export interface IssueCredentialRequest {
   issuerSignedMessage: string; // Signature from issuer's private key
   // issuerPublicKey: string; // Issuer's public key
   issuerAddress: string;
+  issuerMessageHash: string;
 }
 
 export interface ProcessBatchRequest {
@@ -247,4 +248,56 @@ function isValidHex(hex: string): boolean {
   const cleanHex = hex.startsWith("0x") ? hex.slice(2) : hex;
   const hexRegex = /^[0-9a-fA-F]+$/;
   return hexRegex.test(cleanHex) && cleanHex.length > 0;
+}
+export interface RegisterOrganizationRequest {
+  orgAddress: string; // Organization's Starknet address (hex)
+  orgName?: string;   // Optional organization name
+  signature: {
+    r: string;
+    s: string;
+  }; // Signature to prove ownership and prevent spam
+}
+
+export interface RegisterOrganizationResponse {
+  success: boolean;
+  orgId?: string; // Organization ID from the event
+  transactionHash: string;
+  message?: string;
+}
+
+export function validateRegisterOrganizationRequest(data: any): {
+  isValid: boolean;
+  errors: string[];
+} {
+  const errors: string[] = [];
+
+  if (!data.orgAddress || typeof data.orgAddress !== "string") {
+    errors.push("orgAddress is required and must be a string");
+  }
+
+  if (!data.signature || typeof data.signature !== "object") {
+    errors.push("signature is required and must be an object");
+  } else {
+    if (!data.signature.r || typeof data.signature.r !== "string") {
+      errors.push("signature.r is required and must be a string");
+    }
+    if (!data.signature.s || typeof data.signature.s !== "string") {
+      errors.push("signature.s is required and must be a string");
+    }
+  }
+
+  // Validate hex format for addresses
+  if (data.orgAddress && !isValidHex(data.orgAddress)) {
+    errors.push("orgAddress must be a valid hex string");
+  }
+
+  // Validate hex format for signature components
+  if (data.signature?.r && !isValidHex(data.signature.r)) {
+    errors.push("signature.r must be a valid hex string");
+  }
+  if (data.signature?.s && !isValidHex(data.signature.s)) {
+    errors.push("signature.s must be a valid hex string");
+  }
+
+  return { isValid: errors.length === 0, errors };
 }

@@ -6,7 +6,7 @@ export interface VerificationRequest {
   pathElements: string[];
   pathIndices: number[];
   issuerSignedMessage: string;
-  issuerAddress: string;           // Issuer's wallet address
+  // issuerAddress is now fetched from blockchain using batchId
   messageHash: string;
   holderSignature: string;         // Signature over verifier's nonce (signed with encryption private key)
   holderEncryptionPublicKey: string; // Holder's encryption public key (not wallet public key)
@@ -45,7 +45,7 @@ export interface CompactVerificationPackage {
   pathElements: string[];
   pathIndices: number[];
   issuerSignedMessage: string;
-  issuerAddress: string;           // Issuer's wallet address
+  // issuerAddress is now fetched from blockchain using batchId
   holderSignature: string;         // Signature over verifier's nonce (signed with encryption private key)
   holderPublicKey: string; // Holder's encryption public key (not wallet public key)
   messageHash: string;

@@ -4,12 +4,15 @@ import {
   validateIssueCredentialRequest,
   validateProcessBatchRequest,
   validateRevokeCredentialRequest,
+  validateRegisterOrganizationRequest,
   IssueCredentialRequest,
   IssueCredentialResponse,
   ProcessBatchRequest,
   ProcessBatchResponse,
   RevokeCredentialRequest,
   RevokeCredentialResponse,
+  RegisterOrganizationRequest,
+  RegisterOrganizationResponse,
 } from "./validation";
 import {
   issueCredential,
@@ -21,6 +24,7 @@ import BlockchainClient from "../blockchain";
 import { IPFSClient } from "../ipfs";
 import { envConfig } from "../config";
 import { KIROCREDABI } from "../blockchain/abi";
+import { getDatabase } from "../db";
 
 const router = Router();
 
@@ -28,13 +32,8 @@ const {
   contractAddress,
   starknetRpcUrl,
   accountAddress,
-  pinataGatewayUrl,
-  pinataJwt,
   privateKey,
 } = envConfig;
-
-// TODO: In production, these should be injected as dependencies or configured via environment
-// For now, we'll create mock instances that throw errors to indicate they need proper configuration
 
 const createIPFSClient = (): IPFSClient => {
   const client = new IPFSClient();
@@ -80,13 +79,11 @@ router.post(
         credentialId: requestData.credentialId,
         attributes: requestData.attributes,
         issuerSignedMessage: requestData.issuerSignedMessage,
-        // issuerPublicKey: requestData.issuerPublicKey,
-        issuerAddress: requestData.issuerAddress,
       };
 
       // Call credential issuance function
       // console.log("Signed message: ", requestData.issuerSignedMessage)
-      const issuedCredential = issueCredential(credentialData);
+      const issuedCredential = issueCredential(credentialData, requestData.issuerAddress);
 
       // Return success response
       const response: IssueCredentialResponse = {
@@ -150,7 +147,16 @@ router.post(
       // Create client instances (in production, these should be injected)
       const ipfsClient = createIPFSClient();
       const blockchainClient = createBlockChainClient();
-      const orgId = 1; // TODO: Get from authentication/organization context
+      
+      // Validate that the issuer is a registered organization
+      const orgId = await blockchainClient.getOrgByAddress(requestData.issuerAddress);
+      if (orgId === 0) {
+        return res.status(403).json({
+          success: false,
+          error: "Unauthorized",
+          message: "Only registered organizations can create batches. Please register your organization first.",
+        });
+      }
 
       // Prepare batch processing request
       const batchRequest: BatchProcessingRequest = {
@@ -160,10 +166,7 @@ router.post(
           credentialId: cred.credentialId,
           attributes: cred.attributes,
           issuerSignedMessage: cred.issuerSignedMessage,
-          // issuerPublicKey: requestData.issuerPublicKey,
-          issuerAddress: requestData.issuerAddress,
         })),
-        // issuerPublicKey: requestData.issuerPublicKey,
         issuerAddress: requestData.issuerAddress,
         batchMetadata: {
           ...requestData.batchMetadata,
@@ -253,16 +256,13 @@ router.post(
     const requestData: RevokeCredentialRequest = req.body;
 
     try {
-      // Create blockchain client instance (in production, this should be injected)
       const blockchainClient = createBlockChainClient();
 
-      // Call blockchain client revokeCredential
       const transactionHash = await blockchainClient.revokeCredential(
         requestData.commitment,
-        parseInt(requestData.batchId), // Convert string batchId to number for blockchain call
+        parseInt(requestData.batchId),
       );
 
-      // Return success response
       const response: RevokeCredentialResponse = {
         success: true,
         commitment: requestData.commitment,
@@ -320,3 +320,212 @@ router.post(
 );
 
 export default router;
+// POST /api/organizations/register endpoint
+router.post(
+  "/organizations/register",
+  asyncHandler(async (req: Request, res: Response) => {
+    // Validate request body
+    const validation = validateRegisterOrganizationRequest(req.body);
+    if (!validation.isValid) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation Error",
+        message: "Invalid request data",
+        details: validation.errors,
+      });
+    }
+
+    const requestData: RegisterOrganizationRequest = req.body;
+
+    try {
+      const blockchainClient = createBlockChainClient();
+
+      // Call the contract's create_org function with signature
+      const transactionHash = await blockchainClient.createOrganization(
+        requestData.orgAddress,
+        requestData.signature,
+      );
+
+      // Read the OrganizationCreated event to get the org_id
+      let orgId: string | undefined;
+      try {
+        const event = await blockchainClient.readEvent("OrganizationCreated", transactionHash);
+        orgId = event.org_id?.toString();
+        
+        // Store organization in database after blockchain success
+        if (orgId) {
+          const db = getDatabase();
+          db.insertOrganization({
+            org_id: parseInt(orgId),
+            org_name: requestData.orgName || null
+          });
+          console.log(`Organization ${orgId} stored in database`);
+        }
+      } catch (eventError) {
+        console.warn("Could not read OrganizationCreated event:", eventError);
+        // Continue without org_id - the transaction was still successful
+      }
+
+      const response: RegisterOrganizationResponse = {
+        success: true,
+        orgId,
+        transactionHash,
+        message: "Organization registered successfully",
+      };
+
+      res.status(200).json(response);
+    } catch (error) {
+      console.error("Error registering organization:", error);
+
+      // Handle specific error types
+      if (error instanceof Error) {
+        if (error.message.includes("already exists")) {
+          return res.status(409).json({
+            success: false,
+            error: "Conflict",
+            message: "Organization with this address already exists",
+          });
+        }
+
+        if (
+          error.message.includes("blockchain") ||
+          error.message.includes("transaction")
+        ) {
+          return res.status(503).json({
+            success: false,
+            error: "Blockchain Error",
+            message: "Failed to register organization on blockchain",
+          });
+        }
+
+        if (error.message.includes("unauthorized") || error.message.includes("permission")) {
+          return res.status(403).json({
+            success: false,
+            error: "Unauthorized",
+            message: "Not authorized to register organizations",
+          });
+        }
+      }
+
+      // Generic error response
+      res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+        message: "Failed to register organization",
+      });
+    }
+  }),
+);
+
+// GET /api/credentials/holder/:address endpoint
+router.get(
+  "/credentials/holder/:address",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { address } = req.params;
+
+    // Validate address format (basic validation)
+    if (!address || typeof address !== 'string' || !address.startsWith('0x')) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation Error",
+        message: "Invalid holder address format",
+      });
+    }
+
+    try {
+      const db = getDatabase();
+      
+      // Get all credentials for this holder with org info
+      const credentials = db.getCredentialsByHolder(address);
+
+      res.status(200).json({
+        success: true,
+        holderAddress: address,
+        credentials: credentials.map(cred => ({
+          credentialId: cred.credential_id,
+          ipfsCid: cred.ipfs_cid,
+          batchId: cred.batch_id,
+          orgId: cred.org_id,
+          orgName: cred.org_name,
+        })),
+        count: credentials.length,
+      });
+    } catch (error) {
+      console.error("Error fetching credentials for holder:", error);
+
+      // Generic error response
+      res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+        message: "Failed to fetch credentials",
+      });
+    }
+  }),
+);
+
+// GET /api/credentials/all endpoint - for verifiers to see all issued credentials
+router.get(
+  "/credentials/all",
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const db = getDatabase();
+      
+      // Get all credentials with org and batch info
+      const credentials = db.getAllCredentials();
+
+      res.status(200).json({
+        success: true,
+        credentials: credentials.map(cred => ({
+          credentialId: cred.credential_id,
+          batchId: cred.batch_id,
+          orgId: cred.org_id,
+          orgName: cred.org_name,
+        })),
+        count: credentials.length,
+      });
+    } catch (error) {
+      console.error("Error fetching all credentials:", error);
+
+      // Generic error response
+      res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+        message: "Failed to fetch credentials",
+      });
+    }
+  }),
+);
+
+// GET /api/batches/all endpoint - for verifiers to see all issued batches
+router.get(
+  "/batches/all",
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const db = getDatabase();
+      
+      // Get all batches with org info and credential count
+      const batches = db.getAllBatches();
+
+      res.status(200).json({
+        success: true,
+        batches: batches.map(batch => ({
+          batchId: batch.batch_id,
+          orgId: batch.org_id,
+          orgName: batch.org_name,
+          credentialCount: batch.credential_count,
+        })),
+        count: batches.length,
+      });
+    } catch (error) {
+      console.error("Error fetching all batches:", error);
+
+      // Generic error response
+      res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+        message: "Failed to fetch batches",
+      });
+    }
+  }),
+);
+

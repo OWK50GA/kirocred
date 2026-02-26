@@ -23,6 +23,7 @@ async function main() {
       console.log(`🔗 API: http://localhost:${PORT}/api`);
       console.log("");
       console.log("Available endpoints:");
+      console.log("  POST /api/organizations/register");
       console.log("  POST /api/credentials/issue");
       console.log("  POST /api/batches/process");
       console.log("  POST /api/credentials/revoke");

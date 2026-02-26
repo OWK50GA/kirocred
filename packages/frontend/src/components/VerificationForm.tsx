@@ -6,6 +6,7 @@ import { CompactVerificationPackage } from '@/types/verification';
 import WalletConnect from './WalletConnect';
 import { deriveEncryptionKeypair, createKeyDerivationTypedData } from '@/lib/encryptionKeys';
 import { ec, typedData } from 'starknet';
+// import { getFullPublicKeyFromSignature } from '@/lib/utils';
 
 interface VerificationFormProps {
   onSubmit: (packageData: CompactVerificationPackage) => void;
@@ -166,6 +167,10 @@ export default function VerificationForm({ onSubmit, isLoading }: VerificationFo
       if (!Array.isArray(parsedPackage.pathElements) || !Array.isArray(parsedPackage.pathIndices)) {
         throw new Error('pathElements and pathIndices must be arrays');
       }
+
+      // if (parsedPackage.holderPublicKey.length <= 65) {
+      //   parsedPackage.holderPublicKey = getFullPublicKeyFromSignature(holderSignature, messageHash);
+      // }
 
       // Add holder signature and nonce to package
       const packageWithSignature = {

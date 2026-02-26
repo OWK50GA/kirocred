@@ -110,35 +110,33 @@ export class BlockchainClient {
    * Create organization in the smart contract
    * Requirements: 6.1, 6.2, 6.3
    */
-  async createOrganization(
-    orgAddress: string,
-    orgPublicKey: string,
-  ): Promise<string> {
-    try {
-      const callData = new CallData(this.abi).compile("create_org", {
-        org_address: orgAddress,
-        org_pubkey: this.hexToFelt(orgPublicKey),
-      });
+  /**
+     * Create organization in the smart contract
+     * Security: Only the organization address itself can register
+     */
+    async createOrganization(
+      orgAddress: string,
+      signature: { r: string; s: string }
+    ): Promise<string> {
+      try {
+        const callData = new CallData(this.abi).compile("create_org", {
+          org_address: orgAddress,
+          // signature: [signature.r, signature.s],
+        });
 
-      // const typedContract = this.contract.typedv2(KIROCREDABI);
+        const { transaction_hash } = await this.account.execute([
+          {
+            contractAddress: this.contract.address,
+            calldata: callData,
+            entrypoint: "create_org",
+          },
+        ]);
 
-      // const result = typedContract.create_org(callData);
-      // // const result = await this.contract.create_org(callData);
-      // const txResult = await this.waitForTransaction(result.transaction_hash);
-
-      const { transaction_hash } = await this.account.execute([
-        {
-          contractAddress: this.contract.address,
-          calldata: callData,
-          entrypoint: "create_org",
-        },
-      ]);
-
-      return transaction_hash;
-    } catch (error) {
-      this.handleContractError(error, "Organization creation");
+        return transaction_hash;
+      } catch (error) {
+        this.handleContractError(error, "Organization creation");
+      }
     }
-  }
 
   /**
    * Create batch in the smart contract
@@ -149,21 +147,12 @@ export class BlockchainClient {
     orgId: number,
   ): Promise<string> {
     try {
-      // Convert batch type to enum value
       const batchTypeValue = batchType === "BATCH" ? 0 : 1;
 
-      // const callData = CallData.compile({
-      //   batch_type: batchTypeValue,
-      //   org_id: orgId,
-      // });
       const calldata = new CallData(this.abi).compile("create_batch", {
         batch_type: batchTypeValue,
         org_id: orgId,
       });
-
-      // const typedContract = this.contract.typedv2(KIROCREDABI);
-      // const result = typedContract.create_batch(callData);
-      // const txResult = await this.waitForTransaction(result.transaction_hash);
 
       const { transaction_hash } = await this.account.execute([
         {
@@ -227,10 +216,6 @@ export class BlockchainClient {
         batch_id: batchId,
       });
 
-      // const typedContract = this.contract.typedv2(KIROCREDABI);
-      // const result = typedContract.revoke(callData);
-      // const txResult = await this.waitForTransaction(result.transaction_hash);
-
       const { transaction_hash } = await this.account.execute([
         {
           contractAddress: this.contract.address,
@@ -271,6 +256,18 @@ export class BlockchainClient {
       return num.toHex(result);
     } catch (error) {
       this.handleContractError(error, "Get issuer public key");
+    }
+  }
+  /**
+   * Get organization ID by address
+   */
+  async getOrgByAddress(orgAddress: string): Promise<number> {
+    try {
+      const typedContract = this.contract.typedv2(KIROCREDABI);
+      const result = await typedContract.get_org_by_address(orgAddress);
+      return Number(result);
+    } catch (error) {
+      this.handleContractError(error, "Get organization by address");
     }
   }
 

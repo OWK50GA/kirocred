@@ -105,6 +105,40 @@ Revokes a credential by marking its commitment hash as revoked on the blockchain
 }
 ```
 
+### GET /api/credentials/holder/:address
+
+Retrieves all credentials for a specific holder address from the database.
+
+**URL Parameters:**
+- `address`: Holder's Starknet address (must start with `0x`)
+
+**Example Request:**
+```
+GET /api/credentials/holder/0x1234567890abcdef
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "holderAddress": "0x1234567890abcdef",
+  "credentials": [
+    {
+      "credentialId": "550e8400-e29b-41d4-a716-446655440002",
+      "ipfsCid": "QmXyZ...",
+      "batchId": 1,
+      "orgId": 1,
+      "orgName": "Example University"
+    }
+  ],
+  "count": 1
+}
+```
+
+**Use Case:**
+This endpoint enables credential discovery for holders. When a holder connects their wallet, the frontend can query this endpoint to display all credentials issued to that address, allowing the holder to select which credential to use for verification.
+
 ## Error Handling
 
 All endpoints return appropriate HTTP status codes and error messages:

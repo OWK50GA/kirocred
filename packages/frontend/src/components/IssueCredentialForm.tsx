@@ -36,6 +36,8 @@ export default function IssueCredentialForm({ onCredentialIssued }: IssueCredent
       // Generate credential ID
       const credentialId = crypto.randomUUID();
 
+      if (holderPublicKey.length != 64) throw new Error("Compressed public key required");
+
       const requestBody = {
         holderPublicKey,
         credentialId,

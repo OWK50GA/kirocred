@@ -18,8 +18,7 @@ export interface CredentialData {
   holderPublicKey: string;
   attributes: Record<string, any>;
   issuerSignedMessage: string;
-  // issuerPublicKey: string;
-  issuerAddress: string | `0x${string}`;
+  // Note: issuerAddress is now obtained from the connected wallet, not from credential data
 }
 
 /**
@@ -37,8 +36,7 @@ export interface IssuedCredential {
   attributeSalts: Record<string, string>;
   salt: string;
   attributesHash: string;
-  issuerAddress: string,
-  holderPublicKey: string
+  holderPublicKey: string;
 }
 
 /**
@@ -46,18 +44,18 @@ export interface IssuedCredential {
  * Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6
  *
  * @param credentialData - Credential data including holder public key, attributes, and issuer signature
+ * @param issuerAddress - Issuer address from the connected wallet
  * @returns IssuedCredential with commitment, encrypted data, and metadata
  */
 export function issueCredential(
   credentialData: CredentialData,
+  issuerAddress: string | `0x${string}`,
 ): IssuedCredential {
   const {
     credentialId,
     holderPublicKey,
     attributes,
     issuerSignedMessage,
-    // issuerPublicKey,
-    issuerAddress,
   } = credentialData;
   // console.log(credentialData);
 
@@ -132,7 +130,6 @@ export function issueCredential(
     attributeSalts,
     salt,
     attributesHash,
-    issuerAddress,
     holderPublicKey
   };
 }
@@ -189,8 +186,7 @@ export interface CredentialPackage {
 
   // Signatures
   issuerSignedMessage: string; // Issuer's signature
-  issuerAddress: string,
-  holderPublicKey: string
+  holderPublicKey: string;
 
   // Salts for selective disclosure
   attributeSalts: Record<string, string>;
@@ -237,14 +233,7 @@ export function processBatch(
   const commitments: string[] = [];
 
   for (const credentialData of credentials) {
-    // Ensure issuer public key matches
-    if (credentialData.issuerAddress !== issuerAddress) {
-      throw new Error(
-        `Credential ${credentialData.credentialId} has mismatched issuer public key`,
-      );
-    }
-
-    const issuedCredential = issueCredential(credentialData);
+    const issuedCredential = issueCredential(credentialData, issuerAddress);
     issuedCredentials.push(issuedCredential);
     commitments.push(issuedCredential.commitment);
   }
@@ -281,7 +270,6 @@ export function processBatch(
 
       // Signatures
       issuerSignedMessage: originalCredential.issuerSignedMessage,
-      issuerAddress: issuedCredential.issuerAddress,
       holderPublicKey: issuedCredential.holderPublicKey,
 
       // Salts for selective disclosure
@@ -303,6 +291,7 @@ import { IPFSClient } from "../ipfs/index";
 import { BlockchainClient } from "../blockchain/index";
 import { byteArray, RpcProvider } from "starknet";
 import { envConfig } from "../config";
+import { getDatabase } from "../db";
 
 /**
  * Batch storage and publishing result
@@ -386,6 +375,33 @@ export async function storeBatchAndPublish(
       parseInt(batchIdNumber),
       merkleRoot,
     );
+
+    // Store batch and credentials in database after blockchain success
+    try {
+      const db = getDatabase();
+      
+      // Store batch
+      db.insertBatch({
+        batch_id: parseInt(batchIdNumber),
+        org_id: orgId
+      });
+      console.log(`Batch ${batchIdNumber} stored in database`);
+
+      // Store credentials
+      const credentialsToStore = credentialPackages.map((pkg, index) => ({
+        holder_address: pkg.holderPublicKey,
+        batch_id: parseInt(batchIdNumber),
+        ipfs_cid: credentialCIDs[index].ipfsCid,
+        credential_id: pkg.credentialId
+      }));
+
+      db.insertCredentialsBatch(credentialsToStore);
+      console.log(`${credentialsToStore.length} credentials stored in database`);
+    } catch (dbError) {
+      console.error("Failed to store batch/credentials in database:", dbError);
+      // Don't fail the entire operation if database storage fails
+      // The blockchain transaction already succeeded
+    }
 
     return {
       batchId: batchIdNumber,
