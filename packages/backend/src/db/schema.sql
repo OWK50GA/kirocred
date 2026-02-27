@@ -1,4 +1,4 @@
--- Kirocred Database Schema
+-- Kirocred Database Schema (PostgreSQL)
 -- Minimal schema for credential discovery
 
 -- Organizations table

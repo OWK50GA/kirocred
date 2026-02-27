@@ -351,8 +351,8 @@ router.post(
         
         // Store organization in database after blockchain success
         if (orgId) {
-          const db = getDatabase();
-          db.insertOrganization({
+          const db = await getDatabase();
+          await db.insertOrganization({
             org_id: parseInt(orgId),
             org_name: requestData.orgName || null
           });
@@ -430,10 +430,10 @@ router.get(
     }
 
     try {
-      const db = getDatabase();
+      const db = await getDatabase();
       
       // Get all credentials for this holder with org info
-      const credentials = db.getCredentialsByHolder(address);
+      const credentials = await db.getCredentialsByHolder(address);
 
       res.status(200).json({
         success: true,
@@ -465,10 +465,10 @@ router.get(
   "/credentials/all",
   asyncHandler(async (req: Request, res: Response) => {
     try {
-      const db = getDatabase();
+      const db = await getDatabase();
       
       // Get all credentials with org and batch info
-      const credentials = db.getAllCredentials();
+      const credentials = await db.getAllCredentials();
 
       res.status(200).json({
         success: true,
@@ -498,10 +498,10 @@ router.get(
   "/batches/all",
   asyncHandler(async (req: Request, res: Response) => {
     try {
-      const db = getDatabase();
+      const db = await getDatabase();
       
       // Get all batches with org info and credential count
-      const batches = db.getAllBatches();
+      const batches = await db.getAllBatches();
 
       res.status(200).json({
         success: true,

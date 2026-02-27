@@ -29,6 +29,10 @@ target/
 .env.local
 .env.*.local
 
+*.db
+
+DEPLOYMENT.md
+
 # IDE
 .vscode/
 .idea/

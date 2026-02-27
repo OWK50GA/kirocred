@@ -359,10 +359,10 @@ export async function storeBatchAndPublish(
 
     // Store batch and credentials in database after blockchain success
     try {
-      const db = getDatabase();
+      const db = await getDatabase();
       
       // Store batch
-      db.insertBatch({
+      await db.insertBatch({
         batch_id: parseInt(batchIdNumber),
         org_id: orgId
       });
@@ -376,7 +376,7 @@ export async function storeBatchAndPublish(
         credential_id: pkg.credentialId
       }));
 
-      db.insertCredentialsBatch(credentialsToStore);
+      await db.insertCredentialsBatch(credentialsToStore);
       console.log(`${credentialsToStore.length} credentials stored in database`);
     } catch (dbError) {
       console.error("Failed to store batch/credentials in database:", dbError);
