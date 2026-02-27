@@ -1,14 +1,13 @@
 'use client'
 
 import { Chain, mainnet, sepolia } from "@starknet-react/chains";
-import { alchemyProvider, argent, braavos, jsonRpcProvider, StarknetConfig, useInjectedConnectors, voyager } from "@starknet-react/core";
+import { argent, braavos, jsonRpcProvider, StarknetConfig, useInjectedConnectors, voyager } from "@starknet-react/core";
 import { ReactNode } from "react";
 
 export default function StarknetProvider({ children }: {
     children: ReactNode
 }){
 
-    const apiKey = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
     const { connectors } = useInjectedConnectors({
         recommended: [argent(), braavos()],
         includeRecommended: 'always'
