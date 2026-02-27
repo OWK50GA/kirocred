@@ -14,7 +14,6 @@ async function testDatabase() {
   console.log('DATABASE_URL:', process.env.DATABASE_URL ? 'Set' : 'Not set');
 
   const db = new DatabaseClient();
-  await db.initialize();
 
   try {
     // Test 1: Insert organization

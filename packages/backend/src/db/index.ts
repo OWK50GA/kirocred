@@ -1,6 +1,4 @@
-import { Pool, PoolClient } from 'pg';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { Pool } from 'pg';
 import { Organization, Batch, Credential } from './types';
 import { envConfig } from '../config';
 
@@ -13,8 +11,6 @@ export class DatabaseClient {
   private pool: Pool;
 
   constructor() {
-    // const dbUrl = connectionString || process.env.DATABASE_URL;
-    
     if (!dbUrl) {
       throw new Error('DATABASE_URL environment variable is not set');
     }
@@ -25,12 +21,6 @@ export class DatabaseClient {
       connectionString: dbUrl,
       ssl: useSSL ? { rejectUnauthorized: false } : undefined,
     });
-  }
-
-  async initialize() {
-    const schemaPath = join(__dirname, 'schema.sql');
-    const schema = readFileSync(schemaPath, 'utf-8');
-    await this.pool.query(schema);
   }
 
   // Organization operations
@@ -198,7 +188,6 @@ let dbInstance: DatabaseClient | null = null;
 export async function getDatabase(): Promise<DatabaseClient> {
   if (!dbInstance) {
     dbInstance = new DatabaseClient();
-    await dbInstance.initialize();
   }
   return dbInstance;
 }
