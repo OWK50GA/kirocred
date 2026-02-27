@@ -15,9 +15,5 @@
     "test:backend": "npm run test -w @kirocred/backend",
     "test:frontend": "npm run test -w @kirocred/frontend",
     "verify-setup": "bash scripts/verify-setup.sh"
-  },
-  "devDependencies": {
-    "@types/node": "^20.10.0",
-    "typescript": "^5.9.3"
   }
 }
