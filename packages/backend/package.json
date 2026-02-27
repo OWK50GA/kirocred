@@ -5,9 +5,11 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "dev": "tsx watch src/server.ts",
-    "start": "npm run migrate && node dist/server.js",
+    "start": "npm run reset && node dist/server.js",
     "build": "tsc",
     "migrate": "node migrate.js",
+    "db:clear": "node clear-db.js",
+    "db:reset": "node clear-db.js && node migrate.js",
     "test": "jest",
     "test:watch": "jest --watch",
     "format": "prettier --write ."
