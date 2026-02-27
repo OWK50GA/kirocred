@@ -7,8 +7,7 @@ import {
   encryptKeyToHolder,
   verifyIssuerSignature,
 } from "../crypto/index";
-
-const { starknetRpcUrl } = envConfig;
+import { envConfig } from "../config";
 
 /**
  * Credential data structure for issuance
@@ -278,7 +277,6 @@ export function processBatch(
 import { IPFSClient } from "../ipfs/index";
 import { BlockchainClient } from "../blockchain/index";
 import { byteArray, RpcProvider } from "starknet";
-import { envConfig } from "../config";
 import { getDatabase } from "../db";
 
 /**
@@ -313,6 +311,7 @@ export async function storeBatchAndPublish(
   orgId: number,
 ): Promise<BatchStorageResult> {
   const { merkleRoot, credentialPackages } = batchResult;
+  const { starknetRpcUrl } = envConfig;
   // console.log("Merkle Root unchanged: ", merkleRoot);
 
   const provider = new RpcProvider({ nodeUrl: starknetRpcUrl });
