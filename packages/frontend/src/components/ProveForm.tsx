@@ -114,9 +114,6 @@ export default function ProveForm() {
       }
 
       const { privateKey, publicKey } = deriveEncryptionKeypair(walletSignature);
-      console.log("Private key: ", privateKey);
-      console.log("Public key: ",publicKey)
-      console.log("Compressed: ", compressPublicKey(publicKey));
       setEncryptionPrivateKey(privateKey);
       setEncryptionPublicKey(publicKey);
 
@@ -174,19 +171,8 @@ export default function ProveForm() {
       const signature = ec.starkCurve.sign(msgHash, encryptionPrivateKey);
       // console.log(ec.starkCurve.getStarkKey(privateKeyHex) === encryptionPublicKey);
       const compactHexSignature = signature.toCompactHex();
-      // const pkFromMsgHash = 
-      console.log("Pub key from msgHash: ", signature.recoverPublicKey(hexToUint8Array(msgHash)).toHex(false));
-      console.log("Encryptuon pub key: ", encryptionPublicKey)
-
-      console.log(ec.starkCurve.verify(compactHexSignature, msgHash, stark.getFullPublicKey(encryptionPrivateKey)));
-      console.log(ec.starkCurve.verify(compactHexSignature, msgHash, encryptionPublicKey!));
-      console.log("derived from priv key: ", stark.getFullPublicKey(encryptionPrivateKey));
-      console.log("Encryption pub key: ", encryptionPublicKey);
-      // console.log("Calculated: ", starkKeyToFullPublicKey(encryptionPublicKey!));
       
-      console.log(signature);
       setHolderSignature(compactHexSignature);
-      console.log(compactHexSignature);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign nonce');
     } finally {
@@ -217,8 +203,6 @@ export default function ProveForm() {
       setError('Please complete all steps first');
       return;
     }
-
-    console.log("Encryption public key: ", encryptionPublicKey);
 
     try {
       const parsedPackage = JSON.parse(packageJson);

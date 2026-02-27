@@ -81,7 +81,6 @@ export default function BatchProcessForm({ credentials, onBatchProcessed }: Batc
       const requestBody = {
         batchId,
         credentials: credentials.map(cred =>  {
-          // console.log("Issuer signed message",cred.issuerSignedMessage);
           return ({
             holderPublicKey: cred.holderPublicKey,
             credentialId: cred.credentialId,
