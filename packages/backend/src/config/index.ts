@@ -20,6 +20,9 @@ if (!pinataGatewayUrl) throw new Error("Pinata gateway url not set");
 const contractAddress = process.env.CONTRACT_ADDRESS;
 if (!contractAddress) throw new Error("Kirocred contract address not set");
 
+const dbUrl = process.env.DATABASE_URL;
+if (!dbUrl) throw new Error("Kirocred dbUrl missing");
+
 const port = process.env.PORT || 3001;
 const env = process.env.NODE_ENV || "development";
 
@@ -32,4 +35,5 @@ export const envConfig = {
   contractAddress,
   port,
   env,
+  dbUrl
 };

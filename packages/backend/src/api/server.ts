@@ -2,16 +2,13 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import routes from "./routes";
 
-// Error interface for consistent error handling
 interface ApiError extends Error {
   statusCode?: number;
 }
 
-// Create Express server setup
 export function createServer(): express.Application {
   const app = express();
 
-  // Middleware setup
   app.use(
     cors({
       origin: process.env.CORS_ORIGIN || "*",
@@ -23,13 +20,11 @@ export function createServer(): express.Application {
   app.use(express.json({ limit: "10mb" }));
   app.use(express.urlencoded({ extended: true }));
 
-  // Request logging middleware
   app.use((req: Request, res: Response, next: NextFunction) => {
     console.log(`${new Date().toISOString()} - ${req.method} ${req.path}`);
     next();
   });
 
-  // Health check endpoint
   app.get("/health", (req: Request, res: Response) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
@@ -39,9 +34,7 @@ export function createServer(): express.Application {
   return app;
 }
 
-// Error handling middleware
 export function setupErrorHandling(app: express.Application): void {
-  // 404 handler
   app.use((req: Request, res: Response) => {
     res.status(404).json({
       success: false,
@@ -50,7 +43,6 @@ export function setupErrorHandling(app: express.Application): void {
     });
   });
 
-  // Global error handler
   app.use((err: ApiError, req: Request, res: Response, next: NextFunction) => {
     console.error("API Error:", err);
 
@@ -65,7 +57,6 @@ export function setupErrorHandling(app: express.Application): void {
   });
 }
 
-// Request validation helper
 export function validateRequest(schema: any) {
   return (req: Request, res: Response, next: NextFunction) => {
     const { error } = schema.validate(req.body);
@@ -78,7 +69,6 @@ export function validateRequest(schema: any) {
   };
 }
 
-// Async route handler wrapper
 export function asyncHandler(
   fn: (req: Request, res: Response, next: NextFunction) => Promise<any>,
 ) {

@@ -1,79 +1,92 @@
-import Database from 'better-sqlite3';
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { Pool } from 'pg';
 import { Organization, Batch, Credential } from './types';
+import { envConfig } from '../config';
+
+const { dbUrl } = envConfig;
 
 /**
- * Minimal database client for credential discovery
+ * PostgreSQL database client for credential discovery
  */
 export class DatabaseClient {
-  private db: Database.Database;
+  private pool: Pool;
 
-  constructor(dbPath: string = './kirocred.db') {
-    this.db = new Database(dbPath);
-    this.db.pragma('journal_mode = WAL');
-    this.initialize();
-  }
+  constructor() {
+    if (!dbUrl) {
+      throw new Error('DATABASE_URL environment variable is not set');
+    }
 
-  private initialize() {
-    const schemaPath = join(__dirname, 'schema.sql');
-    const schema = readFileSync(schemaPath, 'utf-8');
-    this.db.exec(schema);
+    const useSSL = dbUrl.includes('render.com')
+    
+    this.pool = new Pool({
+      connectionString: dbUrl,
+      ssl: useSSL ? { rejectUnauthorized: false } : undefined,
+    });
   }
 
   // Organization operations
-  insertOrganization(org: Organization) {
-    const stmt = this.db.prepare(`
+  async insertOrganization(org: Organization) {
+    const query = `
       INSERT INTO organizations (org_id, org_name)
-      VALUES (?, ?)
-    `);
-    return stmt.run(org.org_id, org.org_name);
+      VALUES ($1, $2)
+      ON CONFLICT (org_id) DO NOTHING
+      RETURNING *
+    `;
+    const result = await this.pool.query(query, [org.org_id, org.org_name]);
+    return result.rows[0];
   }
 
-  getOrganization(org_id: number): Organization | undefined {
-    const stmt = this.db.prepare(`SELECT * FROM organizations WHERE org_id = ?`);
-    return stmt.get(org_id) as Organization | undefined;
+  async getOrganization(org_id: number): Promise<Organization | undefined> {
+    const query = `SELECT * FROM organizations WHERE org_id = $1`;
+    const result = await this.pool.query(query, [org_id]);
+    return result.rows[0];
   }
 
   // Batch operations
-  insertBatch(batch: Batch) {
-    const stmt = this.db.prepare(`
+  async insertBatch(batch: Batch) {
+    const query = `
       INSERT INTO batches (batch_id, org_id)
-      VALUES (?, ?)
-    `);
-    return stmt.run(batch.batch_id, batch.org_id);
+      VALUES ($1, $2)
+      ON CONFLICT (batch_id) DO NOTHING
+      RETURNING *
+    `;
+    const result = await this.pool.query(query, [batch.batch_id, batch.org_id]);
+    return result.rows[0];
   }
 
-  getBatch(batch_id: number): Batch | undefined {
-    const stmt = this.db.prepare(`SELECT * FROM batches WHERE batch_id = ?`);
-    return stmt.get(batch_id) as Batch | undefined;
+  async getBatch(batch_id: number): Promise<Batch | undefined> {
+    const query = `SELECT * FROM batches WHERE batch_id = $1`;
+    const result = await this.pool.query(query, [batch_id]);
+    return result.rows[0];
   }
 
-  getBatchesByOrg(org_id: number): Batch[] {
-    const stmt = this.db.prepare(`SELECT * FROM batches WHERE org_id = ?`);
-    return stmt.all(org_id) as Batch[];
+  async getBatchesByOrg(org_id: number): Promise<Batch[]> {
+    const query = `SELECT * FROM batches WHERE org_id = $1`;
+    const result = await this.pool.query(query, [org_id]);
+    return result.rows;
   }
 
   // Credential operations
-  insertCredential(credential: Credential) {
-    const stmt = this.db.prepare(`
+  async insertCredential(credential: Credential) {
+    const query = `
       INSERT INTO credentials (holder_address, batch_id, ipfs_cid, credential_id)
-      VALUES (?, ?, ?, ?)
-    `);
-    return stmt.run(
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `;
+    const result = await this.pool.query(query, [
       credential.holder_address,
       credential.batch_id,
       credential.ipfs_cid,
-      credential.credential_id
-    );
+      credential.credential_id,
+    ]);
+    return result.rows[0];
   }
 
   /**
    * KEY METHOD: Get all credentials for a holder
    * Returns credentials with org info for display
    */
-  getCredentialsByHolder(holder_address: string): Array<Credential & { org_id: number; org_name: string | null }> {
-    const stmt = this.db.prepare(`
+  async getCredentialsByHolder(holder_address: string): Promise<Array<Credential & { org_id: number; org_name: string | null }>> {
+    const query = `
       SELECT 
         c.holder_address,
         c.batch_id,
@@ -84,17 +97,18 @@ export class DatabaseClient {
       FROM credentials c
       JOIN batches b ON c.batch_id = b.batch_id
       JOIN organizations o ON b.org_id = o.org_id
-      WHERE c.holder_address = ?
-    `);
-    return stmt.all(holder_address) as Array<Credential & { org_id: number; org_name: string | null }>;
+      WHERE c.holder_address = $1
+    `;
+    const result = await this.pool.query(query, [holder_address]);
+    return result.rows;
   }
 
   /**
    * Get all credentials issued on Kirocred (for verifiers)
    * Returns credentials with org and batch info
    */
-  getAllCredentials(): Array<Credential & { org_id: number; org_name: string | null }> {
-    const stmt = this.db.prepare(`
+  async getAllCredentials(): Promise<Array<Credential & { org_id: number; org_name: string | null }>> {
+    const query = `
       SELECT 
         c.holder_address,
         c.batch_id,
@@ -106,16 +120,17 @@ export class DatabaseClient {
       JOIN batches b ON c.batch_id = b.batch_id
       JOIN organizations o ON b.org_id = o.org_id
       ORDER BY c.batch_id DESC, c.credential_id
-    `);
-    return stmt.all() as Array<Credential & { org_id: number; org_name: string | null }>;
+    `;
+    const result = await this.pool.query(query);
+    return result.rows;
   }
 
   /**
    * Get all batches issued on Kirocred (for verifiers)
    * Returns batches with org info and credential count
    */
-  getAllBatches(): Array<{ batch_id: number; org_id: number; org_name: string | null; credential_count: number }> {
-    const stmt = this.db.prepare(`
+  async getAllBatches(): Promise<Array<{ batch_id: number; org_id: number; org_name: string | null; credential_count: number }>> {
+    const query = `
       SELECT 
         b.batch_id,
         b.org_id,
@@ -126,47 +141,60 @@ export class DatabaseClient {
       LEFT JOIN credentials c ON b.batch_id = c.batch_id
       GROUP BY b.batch_id, b.org_id, o.org_name
       ORDER BY b.batch_id DESC
-    `);
-    return stmt.all() as Array<{ batch_id: number; org_id: number; org_name: string | null; credential_count: number }>;
+    `;
+    const result = await this.pool.query(query);
+    return result.rows;
   }
 
   /**
    * Batch insert for performance
    */
-  insertCredentialsBatch(credentials: Credential[]) {
-    const stmt = this.db.prepare(`
-      INSERT INTO credentials (holder_address, batch_id, ipfs_cid, credential_id)
-      VALUES (?, ?, ?, ?)
-    `);
-
-    const insertMany = this.db.transaction((creds: Credential[]) => {
-      for (const cred of creds) {
-        stmt.run(cred.holder_address, cred.batch_id, cred.ipfs_cid, cred.credential_id);
+  async insertCredentialsBatch(credentials: Credential[]) {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      const query = `
+        INSERT INTO credentials (holder_address, batch_id, ipfs_cid, credential_id)
+        VALUES ($1, $2, $3, $4)
+      `;
+      
+      for (const cred of credentials) {
+        await client.query(query, [
+          cred.holder_address,
+          cred.batch_id,
+          cred.ipfs_cid,
+          cred.credential_id,
+        ]);
       }
-    });
-
-    insertMany(credentials);
+      
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  close() {
-    this.db.close();
+  async close() {
+    await this.pool.end();
   }
 }
 
 // Singleton
 let dbInstance: DatabaseClient | null = null;
 
-export function getDatabase(): DatabaseClient {
+export async function getDatabase(): Promise<DatabaseClient> {
   if (!dbInstance) {
-    const dbPath = process.env.DATABASE_PATH || './kirocred.db';
-    dbInstance = new DatabaseClient(dbPath);
+    dbInstance = new DatabaseClient();
   }
   return dbInstance;
 }
 
-export function closeDatabase() {
+export async function closeDatabase() {
   if (dbInstance) {
-    dbInstance.close();
+    await dbInstance.close();
     dbInstance = null;
   }
 }

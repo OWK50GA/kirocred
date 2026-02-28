@@ -3,7 +3,7 @@
 
 import { ec } from 'starknet';
 import cryptoJs from 'crypto-js';
-import { truncateBit256 } from './utils';
+import { normalizeAddress, truncateBit256 } from './utils';
 
 /**
  * Hash a hex buffer using SHA-256
@@ -157,13 +157,8 @@ export function verifyMerkleProof(
     // const calculatedHash = `0x${slicedCleanCalculatedHash}`;
     const calculatedHash = truncateBit256(currentHash);
     console.log("Calculated root: ", calculatedHash)
-
-    // console.log("Calculated root:", calculatedHash);
-    // console.log("Expected root (original):", expectedRoot);
-    // console.log("Expected root (hex):", expectedRootHex);
-    // console.log("Roots match:", calculatedHash === expectedRootHex);
     
-    return calculatedHash === expectedRootHex;
+    return normalizeAddress(calculatedHash) === normalizeAddress(expectedRootHex);
   } catch (error) {
     console.error('Error verifying merkle proof:', error);
     return false;
@@ -184,8 +179,6 @@ export function verifySignature(
 ): boolean {
   try {
     // Use starknet.js verify function
-    console.log("Signature: ", signature);
-    console.log("Public key: ", publicKey);
     const result = ec.starkCurve.verify(
       signature,
       messageHash,
@@ -233,9 +226,6 @@ export function verifyHolderSignature(
 ): boolean {
   try {
     // Verify the signature against the message hash
-    console.log("Holder Public Key: ", holderPublicKey);
-    console.log("Signature b4 fnxn: ", signature)
-    console.log("MessageHash: ", messageHash);
     return verifySignature(messageHash, signature, holderPublicKey);
   } catch (error) {
     console.error('Error verifying holder signature:', error);

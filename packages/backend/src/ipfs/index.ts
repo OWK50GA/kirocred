@@ -179,16 +179,3 @@ export class IPFSClient {
     }
   }
 }
-
-// /**
-//  * Create IPFS client instance
-//  * @param pinataJwt - Pinata JWT token
-//  * @param encryptionKey - Optional encryption key for package encryption
-//  * @returns IPFSClient instance
-//  */
-// export function createIPFSClient(
-//   pinataJwt: string,
-//   encryptionKey?: Buffer,
-// ): IPFSClient {
-//   return new IPFSClient(pinataJwt, encryptionKey);
-// }

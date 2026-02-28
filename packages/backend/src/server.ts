@@ -1,6 +1,3 @@
-// Server entry point for Kirocred backend API
-// This file starts the Express server for the hosted service
-
 import { createServer } from "./api/server";
 import dotenv from "dotenv";
 
@@ -12,10 +9,8 @@ const NODE_ENV = process.env.NODE_ENV || "development";
 
 async function main() {
   try {
-    // Create Express app
     const app = createServer();
 
-    // Start server
     app.listen(PORT, () => {
       console.log("🚀 Kirocred Backend API");
       console.log(`📡 Server running on port ${PORT}`);

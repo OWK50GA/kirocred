@@ -50,10 +50,8 @@ export function buildTree(commitments: string[]): MerkleTree {
     // Process pairs
     for (let i = 0; i < currentLayer.length; i += 2) {
       if (i + 1 < currentLayer.length) {
-        // Hash pair
         nextLayer.push(hashPair(currentLayer[i], currentLayer[i + 1]));
       } else {
-        // Odd number of nodes - duplicate the last one
         nextLayer.push(hashPair(currentLayer[i], currentLayer[i]));
       }
     }

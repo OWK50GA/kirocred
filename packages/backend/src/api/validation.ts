@@ -2,24 +2,21 @@
 // Using a simple validation approach since we don't have joi/yup in dependencies
 
 export interface IssueCredentialRequest {
-  holderPublicKey: string; // Starknet public key (hex)
+  holderPublicKey: string; // public key (hex) -> this will be 64 chars, compressed pubkey
   credentialId: string; // UUIDv4
   attributes: Record<string, any>; // Credential attributes
   issuerSignedMessage: string; // Signature from issuer's private key
-  // issuerPublicKey: string; // Issuer's public key
   issuerAddress: string;
   issuerMessageHash: string;
 }
 
 export interface ProcessBatchRequest {
-  // batchId: string; // UUIDv4
   credentials: Array<{
     holderPublicKey: string;
     credentialId: string;
     attributes: Record<string, any>;
     issuerSignedMessage: string;
   }>;
-  // issuerPublicKey: string; // Issuer's public key for this batch
   issuerAddress: string;
   batchMetadata: {
     description: string;
@@ -133,7 +130,7 @@ export function validateProcessBatchRequest(data: any): {
     errors.push("batchId must be a valid UUIDv4");
   }
 
-  // Validate issuer public key hex format
+  // Validate issuer address hex format
   if (data.issuerAddress && !isValidHex(data.issuerAddress)) {
     errors.push("issuerAddress must be a valid hex string");
   }
@@ -180,15 +177,12 @@ export function validateProcessBatchRequest(data: any): {
       }
       if (
         !cred.issuerSignedMessage
-        // ||
-        // typeof cred.issuerSignedMessage !== "string"
       ) {
         errors.push(
           `credentials[${index}].issuerSignedMessage is required and must be a string`,
         );
       }
 
-      // Validate UUID and hex formats
       if (cred.credentialId && !isValidUUID(cred.credentialId)) {
         errors.push(
           `credentials[${index}].credentialId must be a valid UUIDv4`,

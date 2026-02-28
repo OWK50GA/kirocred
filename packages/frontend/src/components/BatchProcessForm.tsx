@@ -81,7 +81,6 @@ export default function BatchProcessForm({ credentials, onBatchProcessed }: Batc
       const requestBody = {
         batchId,
         credentials: credentials.map(cred =>  {
-          // console.log("Issuer signed message",cred.issuerSignedMessage);
           return ({
             holderPublicKey: cred.holderPublicKey,
             credentialId: cred.credentialId,
@@ -181,7 +180,7 @@ export default function BatchProcessForm({ credentials, onBatchProcessed }: Batc
           />
         </div>
 
-        <div>
+        {/* <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
             Issued By
           </label>
@@ -193,7 +192,7 @@ export default function BatchProcessForm({ credentials, onBatchProcessed }: Batc
             required
             className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#00D9FF] focus:border-transparent text-sm"
           />
-        </div>
+        </div> */}
 
         {error && (
           <div className="p-3 bg-red-500/10 border border-red-500/30 rounded-lg flex items-center gap-3">

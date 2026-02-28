@@ -16,7 +16,7 @@ import {
 } from '@/types/verification';
 import { StarknetClient } from './starknet';
 import { truncateBit256 } from './utils';
-import { ec, typedData, WeierstrassSignatureType } from 'starknet';
+import { ec } from 'starknet';
 
 /**
  * Main credential verification function
@@ -83,7 +83,6 @@ export async function verifyCredential(
 
       // console.log("Acc Sig: ", accSig)
       const bool = ec.starkCurve.verify(request.holderSignature, request.messageHash, request.holderEncryptionPublicKey);
-      console.log(bool);
 
       checks.holderSignatureValid = bool;
 
@@ -100,7 +99,7 @@ export async function verifyCredential(
       // We need to know: what message was signed? and how to parse the signature?
       // For now, mark as valid (placeholder)
       checks.issuerSignatureValid = true;
-      console.log('Issuer signature verification skipped - needs implementation');
+      // console.log('Issuer signature verification skipped - needs implementation');
     } catch (error) {
       errors.push(`Failed to verify issuer signature: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

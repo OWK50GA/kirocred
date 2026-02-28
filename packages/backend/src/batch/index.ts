@@ -7,8 +7,7 @@ import {
   encryptKeyToHolder,
   verifyIssuerSignature,
 } from "../crypto/index";
-
-const { starknetRpcUrl } = envConfig;
+import { envConfig } from "../config";
 
 /**
  * Credential data structure for issuance
@@ -59,7 +58,6 @@ export function issueCredential(
   } = credentialData;
   // console.log(credentialData);
 
-  // Validate input data
   if (
     !credentialId ||
     !holderPublicKey ||
@@ -72,6 +70,7 @@ export function issueCredential(
 
   // Verify issuer signature (Requirement 1.4)
   // So what exactly did the issuer sign if the message and the signed message are the same? Flaw
+  // Fixed in another branch. This will be removed when it is fixed
   if (
     !verifyIssuerSignature(
       issuerSignedMessage,
@@ -112,16 +111,6 @@ export function issueCredential(
     attributeSalts[key] = generateSalt();
   });
 
-  // console.log("Issued credential: ", {
-  //   credentialId,
-  //   commitment,
-  //   encryptedAttributes,
-  //   encryptedKey,
-  //   attributeSalts,
-  //   salt,
-  //   attributesHash,
-  // });
-
   return {
     credentialId,
     commitment,
@@ -155,9 +144,7 @@ export interface BatchMetadata {
  * Batch processing request structure
  */
 export interface BatchProcessingRequest {
-  // batchId: string;
   credentials: CredentialData[];
-  // issuerPublicKey: string;
   issuerAddress: string;
   batchMetadata: BatchMetadata;
 }
@@ -290,7 +277,6 @@ export function processBatch(
 import { IPFSClient } from "../ipfs/index";
 import { BlockchainClient } from "../blockchain/index";
 import { byteArray, RpcProvider } from "starknet";
-import { envConfig } from "../config";
 import { getDatabase } from "../db";
 
 /**
@@ -325,6 +311,7 @@ export async function storeBatchAndPublish(
   orgId: number,
 ): Promise<BatchStorageResult> {
   const { merkleRoot, credentialPackages } = batchResult;
+  const { starknetRpcUrl } = envConfig;
   // console.log("Merkle Root unchanged: ", merkleRoot);
 
   const provider = new RpcProvider({ nodeUrl: starknetRpcUrl });
@@ -364,13 +351,6 @@ export async function storeBatchAndPublish(
       }
     }
 
-    // Create batch on blockchain first
-
-    // Publish merkle root and issuer public key to smart contract (Requirement 2.6, 2.7)
-    // Note: We need to determine the batch ID from the blockchain
-    // For now, we'll use a simple approach - in production, this should be retrieved from the transaction receipt
-    // const batchIdNumber = parseInt(batchId.replace(/\D/g, "")) || 1; // Extract number from UUID or use 1
-
     const publishTxHash = await blockchainClient.storeMerkleRoot(
       parseInt(batchIdNumber),
       merkleRoot,
@@ -378,10 +358,10 @@ export async function storeBatchAndPublish(
 
     // Store batch and credentials in database after blockchain success
     try {
-      const db = getDatabase();
+      const db = await getDatabase();
       
       // Store batch
-      db.insertBatch({
+      await db.insertBatch({
         batch_id: parseInt(batchIdNumber),
         org_id: orgId
       });
@@ -395,7 +375,7 @@ export async function storeBatchAndPublish(
         credential_id: pkg.credentialId
       }));
 
-      db.insertCredentialsBatch(credentialsToStore);
+      await db.insertCredentialsBatch(credentialsToStore);
       console.log(`${credentialsToStore.length} credentials stored in database`);
     } catch (dbError) {
       console.error("Failed to store batch/credentials in database:", dbError);
@@ -412,6 +392,7 @@ export async function storeBatchAndPublish(
   } catch (error) {
     // If any step fails, we should ideally clean up partial state
     // For now, we'll just throw the error
+    // TODO: MAKE THIS AN ALL-OR-NOTHING OR ATOMIC OPERATION -> DYOR
     throw new Error(
       `Batch storage and publishing failed: ${error instanceof Error ? error.message : String(error)}`,
     );
