@@ -16,7 +16,7 @@ import {
 } from '@/types/verification';
 import { StarknetClient } from './starknet';
 import { truncateBit256 } from './utils';
-import { ec, typedData, WeierstrassSignatureType } from 'starknet';
+import { ec } from 'starknet';
 
 /**
  * Main credential verification function

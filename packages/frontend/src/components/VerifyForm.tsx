@@ -24,6 +24,7 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
   const [selectedBatch, setSelectedBatch] = useState<BatchInfo | null>(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const [activeTab, setActiveTab] = useState<'manual' | 'scan'>('manual');
+  const [parsedPackage, setParsedPackage] = useState<any | null>(null);
 
   // Fetch all batches on mount
   useEffect(() => {
@@ -62,20 +63,45 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
     setShowManualInput(true);
   };
 
-  const handleQRResult = (data: object | string) => {
+  const handleQRResult = async (data: object | string) => {
     setError(null);
     try {
-      let jsonString: string;
-      
+      let objData: any;
+
+      // Parse data into object regardless of format
       if (typeof data === 'string') {
-        jsonString = data;
+        objData = JSON.parse(data);
       } else {
-        jsonString = JSON.stringify(data);
+        objData = data;
       }
-      
-      setPackageJson(jsonString);
+
+      // Check if this is a compact QR package with CID
+      if (objData && typeof objData === 'object' && 'cid' in objData) {
+        const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://gateway.pinata.cloud';
+        const cid = objData.cid;
+
+        // Fetch full credential package from IPFS
+        const resp = await fetch(`${gatewayUrl}/ipfs/${cid}`);
+        if (!resp.ok) {
+          throw new Error('Failed to fetch package from IPFS');
+        }
+        const fullPkg = await resp.json();
+        setParsedPackage(fullPkg);
+
+        // Reconstruct exactly as proofData: full package + holder fields (excluding cid)
+        const { cid: _, ...holderFields } = objData;
+        const reconstructedPkg = { ...fullPkg, ...holderFields };
+        
+        const jsonString = JSON.stringify(reconstructedPkg);
+        setPackageJson(jsonString);
+      } else {
+        // Not a compact package, use as-is (manual paste or full QR)
+        const jsonString = typeof data === 'string' ? data : JSON.stringify(data);
+        setPackageJson(jsonString);
+      }
       // Stay on scan tab to show success, user can switch to manual to see the data
     } catch (err) {
+      console.error('handleQRResult error', err);
       setError('Failed to process QR code data');
     }
   };

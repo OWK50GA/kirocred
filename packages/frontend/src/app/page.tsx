@@ -1,20 +1,33 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Header } from '@/components/Header'
 import { RoleCard } from '@/components/RoleCard'
 import { useAccount, useSignTypedData } from '@starknet-react/core'
 import { deriveEncryptionKeypair, createKeyDerivationTypedData } from '@/lib/encryptionKeys'
 import { compressPublicKey } from '@/lib/utils'
+import { CopyButton } from '@/components/CopyButton'
 
 function GetKirocredKeyButton() {
   const [showModal, setShowModal] = useState(false)
+  const modalRef = useRef<HTMLDivElement | null>(null);
   const [publicKey, setPublicKey] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const { address, isConnected } = useAccount()
   const { signTypedDataAsync } = useSignTypedData({})
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (modalRef.current && !modalRef.current.contains(event.target as Node)) {
+        setShowModal(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
 
   const handleGetKey = async () => {
     if (!isConnected || !address) {
@@ -65,42 +78,42 @@ function GetKirocredKeyButton() {
       )}
 
       {showModal && publicKey && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-          <div className="bg-gray-900 rounded-lg border border-gray-800 max-w-lg w-full p-6">
-            <div className="flex justify-between items-start mb-4">
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4"
+          ref={modalRef}
+        >
+          
+          <div className="bg-gray-900 rounded-lg border border-gray-800 max-w-lg w-full py-6">
+            <button
+              onClick={() => setShowModal(false)}
+              className="relative -top-4 left-56 text-gray-400 hover:text-white transition-colors"
+            >
+              ✕
+            </button>
+            <div className="flex justify-center mb-4">
               <h3 className="text-xl font-bold text-white">Your Kirocred Public Key</h3>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
-              >
-                ✕
-              </button>
             </div>
 
             <p className="text-sm text-gray-400 mb-4">
               Share this key with issuers to receive credentials. This key is derived from your wallet signature.
             </p>
 
-            <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 mb-4">
+            <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 mb-4 flex items-center">
               <p className="text-xs font-mono text-gray-300 break-all">
                 {publicKey}
               </p>
+              <CopyButton copyText={publicKey} className="shrink-0"/>
             </div>
 
-            <div className="flex gap-2">
-              <button
-                onClick={copyToClipboard}
-                className="flex-1 px-4 py-2 bg-[#00D9FF] text-black rounded-lg hover:bg-[#00BBFF] font-medium transition-colors"
-              >
-                Copy Key
-              </button>
+            {/* <div className="flex gap-2 w-full mx-auto">
+              <CopyButton copyText={publicKey} className="shrink-0"/>
               <button
                 onClick={() => setShowModal(false)}
                 className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 font-medium transition-colors"
               >
                 Close
               </button>
-            </div>
+            </div> */}
 
             <p className="text-xs text-gray-500 mt-4">
               💡 You can regenerate this key anytime by signing the same message with your wallet.
