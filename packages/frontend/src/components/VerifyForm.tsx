@@ -80,7 +80,10 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
           }
           const fullPkg = await resp.json();
           setParsedPackage(fullPkg);
-          pkg = { ...fullPkg, ...objData };
+          
+          // Reconstruct exactly as proofData: full package + holder fields (excluding cid)
+          const { cid: _, ...holderFields } = objData;
+          pkg = { ...fullPkg, ...holderFields };
         } else {
           pkg = JSON.parse(data);
         }
