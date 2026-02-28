@@ -24,6 +24,7 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
   const [selectedBatch, setSelectedBatch] = useState<BatchInfo | null>(null);
   const [showManualInput, setShowManualInput] = useState(false);
   const [activeTab, setActiveTab] = useState<'manual' | 'scan'>('manual');
+  const [parsedPackage, setParsedPackage] = useState<any | null>(null);
 
   // Fetch all batches on mount
   useEffect(() => {
@@ -62,20 +63,36 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
     setShowManualInput(true);
   };
 
-  const handleQRResult = (data: object | string) => {
+  const handleQRResult = async (data: object | string) => {
     setError(null);
     try {
-      let jsonString: string;
-      
+      let pkg: any;
+
       if (typeof data === 'string') {
-        jsonString = data;
+        const objData = JSON.parse(data);
+        if (objData && typeof objData === 'object' && 'cid' in objData) {
+          const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://gateway.pinata.cloud';
+          const cid = objData.cid;
+
+          const resp = await fetch(`${gatewayUrl}/ipfs/${cid}`);
+          if (!resp.ok) {
+            throw new Error('Failed to fetch package from IPFS');
+          }
+          const fullPkg = await resp.json();
+          setParsedPackage(fullPkg);
+          pkg = { ...fullPkg, ...objData };
+        } else {
+          pkg = JSON.parse(data);
+        }
       } else {
-        jsonString = JSON.stringify(data);
+        pkg = data;
       }
-      
+
+      const jsonString = JSON.stringify(pkg);
       setPackageJson(jsonString);
       // Stay on scan tab to show success, user can switch to manual to see the data
     } catch (err) {
+      console.error('handleQRResult error', err);
       setError('Failed to process QR code data');
     }
   };

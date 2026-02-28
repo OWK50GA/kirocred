@@ -3,7 +3,7 @@
 
 import { ec } from 'starknet';
 import cryptoJs from 'crypto-js';
-import { truncateBit256 } from './utils';
+import { normalizeAddress, truncateBit256 } from './utils';
 
 /**
  * Hash a hex buffer using SHA-256
@@ -158,7 +158,7 @@ export function verifyMerkleProof(
     const calculatedHash = truncateBit256(currentHash);
     console.log("Calculated root: ", calculatedHash)
     
-    return calculatedHash === expectedRootHex;
+    return normalizeAddress(calculatedHash) === normalizeAddress(expectedRootHex);
   } catch (error) {
     console.error('Error verifying merkle proof:', error);
     return false;

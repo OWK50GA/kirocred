@@ -7,6 +7,7 @@ import { ec, hash, num, stark, typedData } from 'starknet';
 import { compressPublicKey, hexToUint8Array, normalizeAddress, starkKeyToFullPublicKey } from '@/lib/utils';
 import { feltToHex } from '@/lib/verification';
 import QRGenerator from './QRGenerator';
+import { CopyButton } from './CopyButton';
 
 interface CredentialInfo {
   credentialId: string;
@@ -18,6 +19,7 @@ interface CredentialInfo {
 
 export default function ProveForm() {
   const [packageJson, setPackageJson] = useState('');
+  // const [qrPackageJson, setQrPackageJson] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [encryptionPrivateKey, setEncryptionPrivateKey] = useState<string | null>(null);
   const [encryptionPublicKey, setEncryptionPublicKey] = useState<string | null>(null);
@@ -27,6 +29,7 @@ export default function ProveForm() {
   const [isDeriving, setIsDeriving] = useState(false);
   const [isSigning, setIsSigning] = useState(false);
   const [proofPackage, setProofPackage] = useState<string | null>(null);
+  const [qrProofPackage, setQrProofPackage] = useState<string | null>(null);
   const [credentials, setCredentials] = useState<CredentialInfo[]>([]);
   const [isLoadingCredentials, setIsLoadingCredentials] = useState(false);
   const [selectedCredential, setSelectedCredential] = useState<CredentialInfo | null>(null);
@@ -210,6 +213,15 @@ export default function ProveForm() {
       if (parsedPackage.holderPublicKey !== compressPublicKey(encryptionPublicKey)) {
         throw new Error("Public keys do not match")
       }
+
+      const qrProofData = {
+        cid: selectedCredential?.ipfsCid,
+        holderSignature,
+        holderEncryptionPublicKey: encryptionPublicKey,
+        holderPublicKey: encryptionPublicKey,
+        messageHash,
+        nonce
+      }
       
       const proofData = {
         ...parsedPackage,
@@ -226,18 +238,20 @@ export default function ProveForm() {
         }
         return value;
       }, 2));
+
+      setQrProofPackage(JSON.stringify(qrProofData, (_key: any, value: unknown) => {
+        if (typeof value === 'bigint') {
+          return value.toString();
+        }
+        return value;
+      }, 2))
+      console.log(qrProofData);
     } catch (err) {
       if (err instanceof SyntaxError) {
         setError('Invalid JSON format');
       } else {
         setError(err instanceof Error ? err.message : 'Failed to generate proof');
       }
-    }
-  };
-
-  const handleCopyProof = () => {
-    if (proofPackage) {
-      navigator.clipboard.writeText(proofPackage);
     }
   };
 
@@ -360,7 +374,7 @@ export default function ProveForm() {
       )}
 
       {/* Proof Package Output */}
-      {proofPackage && (
+      {proofPackage && qrProofPackage && (
         <div className="space-y-4">
           <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
             <h3 className="text-sm font-semibold mb-3 text-white">Proof Package Ready</h3>
@@ -395,28 +409,31 @@ export default function ProveForm() {
             {/* Tab Content */}
             {activeTab === 'qr' ? (
               <div className="flex flex-col items-center py-4">
-                <QRGenerator payload={proofPackage} size={300} />
+                <QRGenerator payload={qrProofPackage} size={300} />
                 <p className="text-xs text-gray-400 mt-4 text-center">
                   Scan this QR code with the verifier's device
                 </p>
               </div>
             ) : (
-              <textarea
-                value={proofPackage}
-                readOnly
-                rows={15}
-                className="w-full px-3 py-2 border border-gray-700 rounded-lg bg-gray-900 font-mono text-sm text-gray-300"
-              />
+              <div className="relative">
+                <textarea
+                  value={proofPackage}
+                  readOnly
+                  rows={15}
+                  className="w-full px-3 py-2 border border-gray-700 rounded-lg bg-gray-900 font-mono text-sm text-gray-300"
+                />
+                <CopyButton copyText={proofPackage} className="absolute top-2 right-2 shrink-0"/>
+              </div>
             )}
           </div>
 
           <div className="flex gap-2">
-            <button
+            {/* <button
               onClick={handleCopyProof}
               className="flex-1 bg-green-600 text-white py-3 px-4 rounded-lg hover:bg-green-700 font-medium transition-colors"
             >
               Copy to Clipboard
-            </button>
+            </button> */}
             <button
               onClick={() => {
                 setProofPackage(null);
