@@ -66,33 +66,39 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
   const handleQRResult = async (data: object | string) => {
     setError(null);
     try {
-      let pkg: any;
+      let objData: any;
 
+      // Parse data into object regardless of format
       if (typeof data === 'string') {
-        const objData = JSON.parse(data);
-        if (objData && typeof objData === 'object' && 'cid' in objData) {
-          const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://gateway.pinata.cloud';
-          const cid = objData.cid;
-
-          const resp = await fetch(`${gatewayUrl}/ipfs/${cid}`);
-          if (!resp.ok) {
-            throw new Error('Failed to fetch package from IPFS');
-          }
-          const fullPkg = await resp.json();
-          setParsedPackage(fullPkg);
-          
-          // Reconstruct exactly as proofData: full package + holder fields (excluding cid)
-          const { cid: _, ...holderFields } = objData;
-          pkg = { ...fullPkg, ...holderFields };
-        } else {
-          pkg = JSON.parse(data);
-        }
+        objData = JSON.parse(data);
       } else {
-        pkg = data;
+        objData = data;
       }
 
-      const jsonString = JSON.stringify(pkg);
-      setPackageJson(jsonString);
+      // Check if this is a compact QR package with CID
+      if (objData && typeof objData === 'object' && 'cid' in objData) {
+        const gatewayUrl = process.env.NEXT_PUBLIC_IPFS_GATEWAY_URL || 'https://gateway.pinata.cloud';
+        const cid = objData.cid;
+
+        // Fetch full credential package from IPFS
+        const resp = await fetch(`${gatewayUrl}/ipfs/${cid}`);
+        if (!resp.ok) {
+          throw new Error('Failed to fetch package from IPFS');
+        }
+        const fullPkg = await resp.json();
+        setParsedPackage(fullPkg);
+
+        // Reconstruct exactly as proofData: full package + holder fields (excluding cid)
+        const { cid: _, ...holderFields } = objData;
+        const reconstructedPkg = { ...fullPkg, ...holderFields };
+        
+        const jsonString = JSON.stringify(reconstructedPkg);
+        setPackageJson(jsonString);
+      } else {
+        // Not a compact package, use as-is (manual paste or full QR)
+        const jsonString = typeof data === 'string' ? data : JSON.stringify(data);
+        setPackageJson(jsonString);
+      }
       // Stay on scan tab to show success, user can switch to manual to see the data
     } catch (err) {
       console.error('handleQRResult error', err);
