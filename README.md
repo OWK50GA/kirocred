@@ -63,7 +63,6 @@ The verifier learns only what the holder explicitly discloses. Verifiers can als
 | AES-256-GCM | Credential attribute encryption |
 | ECDH (STARK curve) | Shared secret for symmetric key encapsulation |
 | ECDSA (STARK curve) | Issuer signatures, holder nonce signatures |
-| Poseidon hash | On-chain commitment hashing (Cairo) |
 | Signature-based key derivation | Wallet-decoupled encryption keypair generation |
 
 ---
@@ -98,6 +97,15 @@ kirocred/
 **Smart Contract** — Stores Merkle roots, issuer public keys, batch metadata, and revocation status on Starknet.
 
 ---
+
+## Technologies Heavily Used:
+- Next.js + TypeScript for frontend
+- Express.js Backend
+- Cairo for Starknet smart contracts
+- @scure/starknet && Starknet.js for ECIES, ECDH and ECDSA
+- Cryptojs for Web encryption
+- Pinata (IPFS)
+- PostgresSQL
 
 ## Setup
 
