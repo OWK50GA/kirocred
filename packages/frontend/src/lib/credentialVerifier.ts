@@ -4,7 +4,7 @@
 import {
   verifyMerkleProof,
   generateNonce,
-  verifyHolderSignature,
+  // verifyHolderSignature,
   validateNonce,
   feltToHex
 } from './verification';
@@ -15,7 +15,7 @@ import {
   CompactVerificationPackage
 } from '@/types/verification';
 import { StarknetClient } from './starknet';
-import { truncateBit256 } from './utils';
+import { starkKeyToFullPublicKey3, truncateBit256 } from './utils';
 import { ec } from 'starknet';
 
 /**
@@ -82,7 +82,8 @@ export async function verifyCredential(
       // console.log(request.holderSignature, request.messageHash, request.holderEncryptionPublicKey);
 
       // console.log("Acc Sig: ", accSig)
-      const bool = ec.starkCurve.verify(request.holderSignature, request.messageHash, request.holderEncryptionPublicKey);
+      const bool = ec.starkCurve.verify(request.holderSignature, request.messageHash, starkKeyToFullPublicKey3(request.holderEncryptionPublicKey));
+      // console.log("Pub key used: ", request.holderEncryptionPublicKey);
 
       checks.holderSignatureValid = bool;
 

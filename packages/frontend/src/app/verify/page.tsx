@@ -7,6 +7,7 @@ import { StatusIndicator } from '@/components/StatusIndicator'
 import VerifyForm from '@/components/VerifyForm'
 import VerificationResultComponent from '@/components/VerificationResult'
 import { CompactVerificationPackage, VerificationResult } from '@/types/verification'
+import { removePubKeyPrefix } from '@/lib/utils'
 
 export default function VerifyPage() {
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)
@@ -25,6 +26,8 @@ export default function VerifyPage() {
       if (!contractAddress) {
         throw new Error('Contract address not configured')
       }
+
+      // packageData.holderPublicKey = removePubKeyPrefix(packageData.holderPublicKey);
       
       const result = await verifyCredentialPackage(
         packageData,

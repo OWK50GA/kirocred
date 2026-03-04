@@ -172,25 +172,26 @@ export function verifyMerkleProof(
  * @param publicKey - Signer's public key (hex string)
  * @returns True if signature is valid, false otherwise
  */
-export function verifySignature(
-  messageHash: string,
-  signature: any,
-  publicKey: string
-): boolean {
-  try {
-    // Use starknet.js verify function
-    const result = ec.starkCurve.verify(
-      signature,
-      messageHash,
-      publicKey
-    );
+// export function verifySignature(
+//   messageHash: string,
+//   signature: any,
+//   publicKey: string
+// ): boolean {
+//   try {
+//     // Use starknet.js verify function
+//     console.log("Public key: ", publicKey);
+//     const result = ec.starkCurve.verify(
+//       signature,
+//       messageHash,
+//       publicKey
+//     );
     
-    return result;
-  } catch (error) {
-    console.error('Error verifying signature:', error);
-    return false;
-  }
-}
+//     return result;
+//   } catch (error) {
+//     console.error('Error verifying signature:', error);
+//     return false;
+//   }
+// }
 
 /**
  * Verify issuer signature on a message
@@ -199,18 +200,18 @@ export function verifySignature(
  * @param issuerPublicKey - Issuer's public key
  * @returns True if signature is valid, false otherwise
  */
-export function verifyIssuerSignature(
-  message: string,
-  signature: any,
-  issuerPublicKey: string
-): boolean {
-  try {
-    return verifySignature(message, signature, issuerPublicKey);
-  } catch (error) {
-    console.error('Error verifying issuer signature:', error);
-    return false;
-  }
-}
+// export function verifyIssuerSignature(
+//   message: string,
+//   signature: any,
+//   issuerPublicKey: string
+// ): boolean {
+//   try {
+//     return verifySignature(message, signature, issuerPublicKey);
+//   } catch (error) {
+//     console.error('Error verifying issuer signature:', error);
+//     return false;
+//   }
+// }
 
 /**
  * Verify holder signature with nonce validation
@@ -219,19 +220,19 @@ export function verifyIssuerSignature(
  * @param holderPublicKey - Holder's encryption public key
  * @returns True if signature is valid, false otherwise
  */
-export function verifyHolderSignature(
-  messageHash: string,
-  signature: any,
-  holderPublicKey: string
-): boolean {
-  try {
-    // Verify the signature against the message hash
-    return verifySignature(messageHash, signature, holderPublicKey);
-  } catch (error) {
-    console.error('Error verifying holder signature:', error);
-    return false;
-  }
-}
+// export function verifyHolderSignature(
+//   messageHash: string,
+//   signature: any,
+//   holderPublicKey: string
+// ): boolean {
+//   try {
+//     // Verify the signature against the message hash
+//     return verifySignature(messageHash, signature, holderPublicKey);
+//   } catch (error) {
+//     console.error('Error verifying holder signature:', error);
+//     return false;
+//   }
+// }
 
 /**
  * Verify disclosed attributes match the commitment

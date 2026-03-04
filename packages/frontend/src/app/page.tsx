@@ -42,24 +42,19 @@ function GetKirocredKeyButton() {
       const typedData = createKeyDerivationTypedData()
       const signature = await signTypedDataAsync(typedData as any)
 
+      console.log("Signature: ", signature);
+
       if (!signature || signature.length < 2) {
         throw new Error('Failed to sign message')
       }
 
-      const { publicKey: fullPubKey } = deriveEncryptionKeypair(signature)
-      const compressed = compressPublicKey(fullPubKey)
-      setPublicKey(compressed)
+      const { publicKey } = deriveEncryptionKeypair(signature)
+      setPublicKey(publicKey)
       setShowModal(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to derive key')
     } finally {
       setIsLoading(false)
-    }
-  }
-
-  const copyToClipboard = () => {
-    if (publicKey) {
-      navigator.clipboard.writeText(publicKey)
     }
   }
 
@@ -104,16 +99,6 @@ function GetKirocredKeyButton() {
               </p>
               <CopyButton copyText={publicKey} className="shrink-0"/>
             </div>
-
-            {/* <div className="flex gap-2 w-full mx-auto">
-              <CopyButton copyText={publicKey} className="shrink-0"/>
-              <button
-                onClick={() => setShowModal(false)}
-                className="px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 font-medium transition-colors"
-              >
-                Close
-              </button>
-            </div> */}
 
             <p className="text-xs text-gray-500 mt-4">
               💡 You can regenerate this key anytime by signing the same message with your wallet.

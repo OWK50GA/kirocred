@@ -1,9 +1,10 @@
 // Encryption key derivation from wallet signatures
 // This allows holders to derive a deterministic encryption keypair from their wallet
 
-import { ec, hash, stark, TypedData } from 'starknet';
+import { ec, hash, stark, TypedData, encode } from 'starknet';
 import { feltToHex } from './verification';
 import { hexToUint8Array } from './utils';
+// import { encode } from 'punycode';
 
 /**
  * Derive encryption keypair from a Starknet wallet signature
@@ -27,22 +28,30 @@ export function deriveEncryptionKeypair(signature: string[] | { r: string; s: st
 
     if (signature.length === 3) {
       r = signature[1];
-    } else if (signature.length === 9) {
-      r = signature[2];
     } else {
-      return { privateKey: "0", publicKey: "0" }
-    }
+      r = signature[2];
+    } 
   } else {
     r = signature.r;
   }
 
   const hexR = feltToHex(BigInt(r))
   
-  const fullPubKey = stark.getFullPublicKey(hexR)
+  const fullPubKey = stark.getFullPublicKey(hexR);
+  const publicKey = ec.starkCurve.getStarkKey(hexR);
+  
+  const stripped = encode.removeHexPrefix(fullPubKey);
+  const yHex = stripped.slice(66);
+  const parity: 0 | 1 = Number(BigInt("0x" + yHex) % 2n) as 0 | 1;
+
+  const prefix = parity === 0 ? "02" : "03";
+
+  const finalPublicKey = encode.addHexPrefix(`${prefix}${encode.removeHexPrefix(publicKey)}`)
   
   return {
     privateKey: hexR,
-    publicKey: fullPubKey,
+    publicKey: finalPublicKey,
+    // parity
   };
 }
 

@@ -11,6 +11,7 @@
     "test:watch": "jest --watch"
   },
   "dependencies": {
+    "@noble/curves": "^2.0.1",
     "@starknet-react/chains": "^5.0.3",
     "@starknet-react/core": "^5.0.3",
     "clsx": "^2.1.1",

@@ -266,7 +266,7 @@ export default function AddCredentialForm({ onCredentialAdded }: AddCredentialFo
           type="text"
           value={formData.holderPublicKey}
           onChange={(e) => setFormData(prev => ({ ...prev, holderPublicKey: e.target.value }))}
-          placeholder="0x..."
+          placeholder="0x03..."
           className="w-full px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#00D9FF] focus:border-transparent font-mono text-sm"
           required
         />
