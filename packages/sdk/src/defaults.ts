@@ -1,0 +1,1 @@
+export const DEFAULT_RPC_URL = "https://api.zan.top/public/starknet-sepolia/rpc/v0_10";

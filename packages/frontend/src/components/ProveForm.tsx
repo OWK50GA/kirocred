@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useAccount, useSignTypedData } from '@starknet-react/core';
 import { deriveEncryptionKeypair, createKeyDerivationTypedData } from '@/lib/encryptionKeys';
 import { ec, hash, num, stark, typedData } from 'starknet';
-import { compressPublicKey, hexToUint8Array, normalizeAddress, starkKeyToFullPublicKey } from '@/lib/utils';
+import { compressPublicKey, hexToUint8Array, normalizeAddress, removePubKeyPrefix, starkKeyToFullPublicKey, starkKeyToFullPublicKey3 } from '@/lib/utils';
 import { feltToHex } from '@/lib/verification';
 import QRGenerator from './QRGenerator';
 import { CopyButton } from './CopyButton';
@@ -53,16 +53,19 @@ export default function ProveForm() {
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-      const response = await fetch(`${backendUrl}/api/credentials/holder/${compressPublicKey(pubKey)}`);
+      const response = await fetch(`${backendUrl}/api/credentials/holder/${pubKey}`);
+      const response2 = await fetch(`${backendUrl}/api/credentials/holder/${removePubKeyPrefix(pubKey)}`)
       
-      if (!response.ok) {
+      if (!response.ok || !response2.ok) {
         throw new Error('Failed to fetch credentials');
       }
 
       const data = await response.json();
+      const data2 = await response2.json();
       
       if (data.success) {
         setCredentials(data.credentials);
+        setCredentials((prev) => [...prev, ...data2.credentials]);
       } else {
         throw new Error(data.message || 'Failed to fetch credentials');
       }
@@ -210,7 +213,8 @@ export default function ProveForm() {
     try {
       const parsedPackage = JSON.parse(packageJson);
 
-      if (parsedPackage.holderPublicKey !== compressPublicKey(encryptionPublicKey)) {
+      if (parsedPackage.holderPublicKey !== encryptionPublicKey && parsedPackage.holderPublicKey !== removePubKeyPrefix(encryptionPublicKey)) {
+        console.log(parsedPackage.holderPublicKey, encryptionPublicKey);
         throw new Error("Public keys do not match")
       }
 

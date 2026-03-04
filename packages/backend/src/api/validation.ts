@@ -149,12 +149,12 @@ export function validateProcessBatchRequest(data: any): {
     ) {
       errors.push("batchMetadata.purpose is required and must be a string");
     }
-    if (
-      !data.batchMetadata.issuedBy ||
-      typeof data.batchMetadata.issuedBy !== "string"
-    ) {
-      errors.push("batchMetadata.issuedBy is required and must be a string");
-    }
+    // if (
+    //   !data.batchMetadata.issuedBy ||
+    //   typeof data.batchMetadata.issuedBy !== "string"
+    // ) {
+    //   errors.push("batchMetadata.issuedBy is required and must be a string");
+    // }
   }
 
   // Validate credentials array

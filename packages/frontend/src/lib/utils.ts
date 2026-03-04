@@ -2,7 +2,8 @@ import crypto from 'crypto'
 import cryptojs from 'crypto-js'
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { ec, WeierstrassSignatureType } from 'starknet'
+import { ec, encode, num, WeierstrassSignatureType } from 'starknet'
+import { bytesToHex } from "@noble/curves/utils.js"
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -195,4 +196,26 @@ export function compressPublicKey(fullPublicKey: string): string {
   // Extract x-coordinate (next 64 chars)
   const xHex = hex.slice(2, 66);
   return '0x' + xHex;
+}
+
+export function removePubKeyPrefix(prefixedPubKey: string): string {
+  const cleaned = encode.removeHexPrefix(prefixedPubKey);
+  
+  // With parity prefix: 2 (prefix) + 64 (x) = 66 chars
+  // Without parity prefix: 64 chars (x only)
+  if ((cleaned.length > 64 && cleaned.length <= 66) && (cleaned.slice(0, 2) === "02" || cleaned.slice(0, 2) === "03")) {
+    return encode.addHexPrefix(cleaned.slice(2));
+  }
+  
+  return encode.addHexPrefix(cleaned);
+}
+
+export function starkKeyToFullPublicKey3 (publicKeyWithParity: string): string {
+  const starkKey = removePubKeyPrefix(publicKeyWithParity);
+  const parity = encode.removeHexPrefix(publicKeyWithParity).slice(0, 2);
+  const myPoint = ec.starkCurve.ProjectivePoint.fromHex(parity + encode.removeHexPrefix(num.toHex64(starkKey)));
+
+  const coord = myPoint.toRawBytes(false);
+  const fullPublicKey: string = encode.addHexPrefix(bytesToHex(coord));
+  return fullPublicKey;
 }

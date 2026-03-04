@@ -1,0 +1,49 @@
+{
+  "name": "@kirocred/sdk",
+  "version": "1.0.0",
+  "description": "core infrastructure for kirocred",
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "test": "jest",
+    "build": "tsup src/index.ts --format esm,cjs --dts",
+    "format": "prettier --write ."
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OWK50GA/kirocred.git"
+  },
+  "keywords": [
+    "cryptography",
+    "privacy",
+    "stark",
+    "starknet",
+    "zero-knowledge"
+  ],
+  "author": "Wilfrid Okorie",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/OWK50GA/kirocred/issues"
+  },
+  "homepage": "https://github.com/OWK50GA/kirocred#readme",
+  "devDependencies": {
+    "@babel/preset-env": "^7.29.0",
+    "@babel/preset-typescript": "^7.28.5",
+    "@types/jest": "^30.0.0",
+    "@types/supertest": "^7.2.0",
+    "babel-jest": "^30.2.0",
+    "jest": "^30.2.0",
+    "supertest": "^7.2.2",
+    "ts-jest": "^29.4.6",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@noble/ciphers": "^2.1.1",
+    "@noble/hashes": "^2.0.1",
+    "prettier": "^3.8.1",
+    "prettier-standalone": "^1.3.1-0",
+    "starknet": "^9.2.1"
+  }
+}

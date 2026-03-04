@@ -6,6 +6,7 @@ import {
   encryptAttributes,
   encryptKeyToHolder,
   verifyIssuerSignature,
+  removePubKeyPrefix,
 } from "../crypto/index";
 import { envConfig } from "../config";
 
@@ -338,7 +339,10 @@ export async function storeBatchAndPublish(
       try {
         // Store encrypted package to IPFS
         credentialPackage.batchId = batchIdNumber;
-        const ipfsCid = await ipfsClient.storePackage(credentialPackage);
+        credentialPackage.holderPublicKey = removePubKeyPrefix(credentialPackage.holderPublicKey);
+        const ipfsCid = await ipfsClient.storePackage({
+
+        });
 
         credentialCIDs.push({
           credentialId: credentialPackage.credentialId,

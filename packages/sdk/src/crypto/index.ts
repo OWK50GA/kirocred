@@ -1,10 +1,10 @@
 import { hash, ec, stark, num, typedData, RpcProvider, encode } from "starknet";
-import crypto from "crypto";
-import { envConfig } from "../config";
-import { bytesToHex, hexToBytes } from "@noble/curves/utils.js"
-
-const { starknetRpcUrl } = envConfig;
-const provider = new RpcProvider({ nodeUrl: starknetRpcUrl });
+import { sha256 } from "@noble/hashes/sha2.js";
+import { randomBytes, bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
+import { gcm } from "@noble/ciphers/aes.js";
+import { bytesToUtf8, utf8ToBytes } from "@noble/ciphers/utils.js";
+import { concatBytes } from "../utils/hex";
+import { DEFAULT_RPC_URL } from "../defaults";
 
 /**
  * Hash credential attributes using keccak256
@@ -22,9 +22,9 @@ export function hashAttributes(attributes: Record<string, any>): string {
   );
 
   const attrString = JSON.stringify(sortedAttrs);
-  // Use Node.js crypto for hashing the string
-  const hashBuffer = crypto.createHash("sha256").update(attrString).digest();
-  return "0x" + hashBuffer.toString("hex");
+  const bytesAttributes = utf8ToBytes(attrString);
+  const hashBuffer = sha256(bytesAttributes);
+  return bytesToHex(hashBuffer);
 }
 
 /**
@@ -32,7 +32,9 @@ export function hashAttributes(attributes: Record<string, any>): string {
  * @returns Hex string salt (32 bytes)
  */
 export function generateSalt(): string {
-  return "0x" + crypto.randomBytes(32).toString("hex");
+  const bytes = randomBytes(32);
+  const hex = bytesToHex(bytes);
+  return "0x" + hex;
 }
 
 /**
@@ -51,16 +53,18 @@ export function computeCommitment(
 ): string {
   // Concatenate all inputs and hash
   const combined = credId + holderPubkey + attributesHash + salt;
-  const hashBuffer = crypto.createHash("sha256").update(combined).digest();
-  return "0x" + hashBuffer.toString("hex");
+  // const hashBuffer = crypto.createHash("sha256").update(combined).digest();
+  const bytesCombined = utf8ToBytes(combined);
+  const hashBuffer = sha256(bytesCombined);
+  return "0x" + hashBuffer.toString();
 }
 
 /**
  * Generate random 256-bit AES key
  * @returns Buffer containing 32 random bytes
  */
-export function generateAESKey(): Buffer {
-  return crypto.randomBytes(32);
+export function generateAESKey(): Uint8Array {
+  return randomBytes(32);
 }
 
 /**
@@ -71,25 +75,31 @@ export function generateAESKey(): Buffer {
  */
 export function encryptAttributes(
   attributes: Record<string, any>,
-  key: Buffer,
+  key: Uint8Array, // MUST BE 32 BYTES
 ): {
   ciphertext: string;
   iv: string;
   authTag: string;
 } {
-  const iv = crypto.randomBytes(12); // 96-bit IV for GCM
-  const cipher = crypto.createCipheriv("aes-256-gcm", key, iv);
+  if (!(key instanceof Uint8Array) || key.length !== 32) {
+    throw new Error("Key must be a 32-byte Uint8Array");
+  }
+  const iv = randomBytes(12); // 96-bit IV for GCM
 
   const plaintext = JSON.stringify(attributes);
-  let ciphertext = cipher.update(plaintext, "utf8", "hex");
-  ciphertext += cipher.final("hex");
+  const plaintextBytes = utf8ToBytes(plaintext);
 
-  const authTag = cipher.getAuthTag();
+  const cipher = gcm(key, iv);
+
+  const ciphertextWithTag = cipher.encrypt(plaintextBytes);
+
+  const authTag = ciphertextWithTag.slice(-16);
+  const ciphertext = ciphertextWithTag.slice(0, -16);
 
   return {
-    ciphertext,
-    iv: iv.toString("hex"),
-    authTag: authTag.toString("hex"),
+    ciphertext: bytesToHex(ciphertext),
+    iv: bytesToHex(iv),
+    authTag: bytesToHex(authTag),
   };
 }
 
@@ -103,20 +113,26 @@ export function encryptAttributes(
  */
 export function decryptAttributes(
   ciphertext: string,
-  key: Buffer,
+  key: Uint8Array,
   iv: string,
   authTag: string,
 ): Record<string, any> {
-  const decipher = crypto.createDecipheriv(
-    "aes-256-gcm",
-    key,
-    Buffer.from(iv, "hex"),
-  );
+  if (!(key instanceof Uint8Array) || key.length !== 32) {
+    throw new Error("Key must be a 32-byte Uint8Array");
+  }
 
-  decipher.setAuthTag(Buffer.from(authTag, "hex"));
+  const ciphertextBytes = hexToBytes(ciphertext);
+  const authTagBytes = hexToBytes(authTag);
+  const ivBytes = hexToBytes(iv);
 
-  let plaintext = decipher.update(ciphertext, "hex", "utf8");
-  plaintext += decipher.final("utf8");
+  const combined = new Uint8Array(ciphertextBytes.length + authTagBytes.length);
+  combined.set(ciphertextBytes, 0);
+  combined.set(authTagBytes, ciphertextBytes.length);
+
+  const decipher = gcm(key, ivBytes);
+  const plaintextBytes = decipher.decrypt(combined);
+
+  const plaintext = bytesToUtf8(plaintextBytes);
 
   return JSON.parse(plaintext);
 }
@@ -124,46 +140,54 @@ export function decryptAttributes(
 /**
  * Encrypt symmetric key to holder's Starknet public key using ECIES
  * @param key - AES key buffer to encrypt
- * @param holderPublicKey - Holder's Starknet public key (hex string)
+ * @param holderPublicKey - Holder's compressed public key
  * @returns Encrypted key as hex string
  */
 export function encryptKeyToHolder(
-  key: Buffer,
-  holderPublicKeyFull: string,
+  key: Uint8Array,
+  holderPublicKey: string,
 ): string {
   // Generate ephemeral key pair - ensure it's within valid range
   const ephemeralPrivateKey: string = stark.randomAddress();
-  const ephemeralPublicKeyFull =
+  const ephemeralPublicKeyBytes =
     ec.starkCurve.getPublicKey(ephemeralPrivateKey);
 
-  // const holderPublicKeyHex = holderPublicKeyFull.slice(2);
-  const ephemeralPubkeyHex = Buffer.from(ephemeralPublicKeyFull).toString(
-    "hex",
-  );
+    const holderPublicKeyFull = starkKeyToFullPublicKey2(holderPublicKey)
 
   // Compute shared secret
-  let sharedSecret = ec.starkCurve.getSharedSecret(
+  const sharedSecret = ec.starkCurve.getSharedSecret(
     ephemeralPrivateKey,
-    hexToBytes(encode.removeHexPrefix(starkKeyToFullPublicKey3(holderPublicKeyFull))),
+    hexToBytes(holderPublicKeyFull.slice(2)),
   );
-  const derivedKey = crypto
-    .createHash("sha256")
-    .update(Buffer.from(sharedSecret))
-    .digest(); // 32 bytes
+
+  const derivedKey = sha256(sharedSecret);
 
   // Encrypt the AES key using derived key
-  const iv = crypto.randomBytes(12); //96-bit IV
-  const cipher = crypto.createCipheriv("aes-256-gcm", derivedKey, iv);
+  const iv = randomBytes(12); //96-bit IV
+  const cipher = gcm(derivedKey, iv);
+  //   const cipher = crypto.createCipheriv("aes-256-gcm", derivedKey, iv);
+  const encryptedKeyWithTag = cipher.encrypt(key);
 
-  let encryptedKey = cipher.update(key);
-  encryptedKey = Buffer.concat([encryptedKey, cipher.final()]);
-  const authTag = cipher.getAuthTag();
+  const authTag = encryptedKeyWithTag.slice(-16);
+  const encryptedKey = encryptedKeyWithTag.slice(0, -16);
 
-  // Return: ephemeralPublicKey || iv || authTag || encryptedKey
-  const epPubBuf = Buffer.from(ephemeralPubkeyHex, "hex");
-  const result = Buffer.concat([epPubBuf, iv, authTag, encryptedKey]);
+//   const totalLength =
+//     ephemeralPublicKeyFull.length +
+//     iv.length +
+//     authTag.length +
+//     encryptedKey.length;
 
-  return "0x" + result.toString("hex");
+  const result = concatBytes(ephemeralPublicKeyBytes, iv, authTag, encryptedKey);
+//   let offset = 0;
+//   result.set(ephemeralPublicKeyFull, offset);
+//   offset += ephemeralPublicKeyFull.length;
+//   result.set(iv, offset);
+//   offset += iv.length;
+//   result.set(authTag, offset);
+//   offset += authTag.length;
+//   result.set(encryptedKey, offset);
+
+  return "0x" + bytesToHex(result);
 }
 
 // THIS SHOULD GO TO THE FRONTEND
@@ -176,11 +200,13 @@ export function encryptKeyToHolder(
 export function decryptKeyFromHolder(
   encryptedKey: string,
   holderPrivateKey: string,
-): Buffer {
-  const encryptedBuffer = Buffer.from(encryptedKey.slice(2), "hex");
+): Uint8Array {
+//   const encryptedBuffer = Buffer.from(encryptedKey.slice(2), "hex");
+    const encryptedBuffer = hexToBytes(encryptedKey.slice(2));
 
   // Parse components: ephemeralPublicKey (32 bytes) || iv (12 bytes) || authTag (16 bytes) || encryptedKey
-  const ephemeralPublicKeyHex = encryptedBuffer.subarray(0, 65).toString("hex");
+//   const ephemeralPublicKeyHex = encryptedBuffer.subarray(0, 65).toString("hex");
+    const ephemeralPublicKeyHex = bytesToHex(encryptedBuffer.subarray(0, 65))
   const iv = encryptedBuffer.subarray(65, 77);
   const authTag = encryptedBuffer.subarray(77, 93);
   const ciphertext = encryptedBuffer.subarray(93);
@@ -194,44 +220,34 @@ export function decryptKeyFromHolder(
     ephemeralPublicKeyHex,
   );
 
-  const derivedKey = crypto
-    .createHash("sha256")
-    .update(Buffer.from(sharedSecret))
-    .digest();
+  const derivedKey = sha256(sharedSecret);
   // const derivedKey = crypto.createHash('sha256').update(combined).digest();
 
+  const combined = concatBytes(ciphertext, authTag);
   // Decrypt the AES key
-  const decipher = crypto.createDecipheriv("aes-256-gcm", derivedKey, iv);
-  decipher.setAuthTag(authTag);
+  const decipher = gcm(derivedKey, iv);
 
-  let decryptedKey = decipher.update(ciphertext);
-  decryptedKey = Buffer.concat([decryptedKey, decipher.final()]);
+  const decryptedKey = decipher.decrypt(combined);
+//   decryptedKey = Buffer.concat([decryptedKey, decipher.final()]);
 
   return decryptedKey;
 }
 
 /**
- * Verify Starknet signature
- * @param message - Message that was signed (hex string or string)
- * @param signature - Signature as array [r, s] or object {r, s}
- * @param publicKey - Signer's public key (hex string)
+ * Verify Starknet signature using ECDSA
+ * @param messageHash - Message hash that was signed (hex string)
+ * @param signature - Signature as array [r, s]
+ * @param publicKey - Signer's public key (hex string, 0x prefixed)
  * @returns True if signature is valid, false otherwise
- * Will by typed data: https://starknetjs.com/docs/guides/account/signature/#verify-typeddata-outside-starknet
  */
-export async function verifySignature(
-  messageHash: any,
-  signature: any,
-  // publicKey: any,
-  accountAddress: `0x${string}`,
-): Promise<boolean> {
+export function verifySignature(
+  messageHash: string,
+  signature: string,
+  publicKey: `0x${string}`,
+): boolean {
   try {
-    const result = await provider.verifyMessageInStarknet(
-      messageHash,
-      signature,
-      accountAddress,
-    );
-
-    return result;
+    const isValid = ec.starkCurve.verify(signature, messageHash, publicKey);
+    return isValid;
   } catch (error) {
     return false;
   }
@@ -239,18 +255,17 @@ export async function verifySignature(
 
 /**
  * Verify issuer signature on a message
- * @param message - Message that was signed
+ * @param messageHash - Message hash that was signed
  * @param signature - Issuer's signature
- * @param issuerPublicKey - Issuer's public key
+ * @param issuerPublicKey - Issuer's public key (hex string, 0x prefixed)
  * @returns True if signature is valid, false otherwise
  */
-export async function verifyIssuerSignature(
-  message: string,
-  signature: any,
-  // issuerPublicKey: string,
-  issuerAccountAddress: `0x${string}`,
-): Promise<boolean> {
-  return await verifySignature(message, signature, issuerAccountAddress);
+export function verifyIssuerSignature(
+  messageHash: string,
+  signature: string,
+  issuerPublicKey: `0x${string}`,
+): boolean {
+  return verifySignature(messageHash, signature, issuerPublicKey);
 }
 
 export interface UserKeyPair {
@@ -268,7 +283,7 @@ export function generateUserKeyPair(): UserKeyPair {
 
   return {
     privateKey,
-    publicKey: "0x" + Buffer.from(publicKeyFull).toString("hex"),
+    publicKey: "0x" + bytesToHex(publicKeyFull),
     starkKey,
   };
 }
@@ -283,22 +298,10 @@ export function hexToUint8Array(hexString: string): Uint8Array {
   return bytes;
 }
 
-/**
- * Convert Uint8Array back to hex string with 0x prefix
- */
-export function uint8ArrayToHex(uint8Array: Uint8Array): string {
-  return (
-    "0x" +
-    Array.from(uint8Array)
-      .map((b) => b.toString(16).padStart(2, "0"))
-      .join("")
-  );
-}
-
 const { CURVE } = ec.starkCurve;
-const p = CURVE.p;          // modulus
-const a = CURVE.a;          // α = 1n
-const b = CURVE.b;          // β
+const p = CURVE.p; // modulus
+const a = CURVE.a; // α = 1n
+const b = CURVE.b; // β
 
 /**
  * Convert a StarkKey (x-coordinate) to full uncompressed public key (0x04 + x + y)
@@ -308,11 +311,15 @@ const b = CURVE.b;          // β
 export function starkKeyToFullPublicKey(starkKey: string): string {
   const normalizedKey = normalizeAddress(starkKey);
   // Normalize x
-  const xHex = normalizedKey.startsWith('0x') ? normalizedKey.slice(2) : normalizedKey;
+  const xHex = normalizedKey.startsWith("0x")
+    ? normalizedKey.slice(2)
+    : normalizedKey;
   if (xHex.length !== 64) {
-    throw new Error(`Invalid StarkKey: expected 64 hex chars, got ${xHex.length}`);
+    throw new Error(
+      `Invalid StarkKey: expected 64 hex chars, got ${xHex.length}`,
+    );
   }
-  const x = BigInt('0x' + xHex);
+  const x = BigInt("0x" + xHex);
 
   // Compute y² = x³ + a·x + b mod p
   const x2 = (x * x) % p;
@@ -322,37 +329,15 @@ export function starkKeyToFullPublicKey(starkKey: string): string {
 
   // Check that ySquared is a quadratic residue (should be for a valid public key)
   if (legendre(ySquared, p) !== 1n) {
-    throw new Error('x does not correspond to a point on the curve');
+    throw new Error("x does not correspond to a point on the curve");
   }
 
   // Compute modular square root using Tonelli–Shanks
   const y = sqrtMod(ySquared, p);
 
   // Format y as 64 hex chars
-  const yHex = y.toString(16).padStart(64, '0');
-  return '0x04' + xHex + yHex;
-}
-
-export function removePubKeyPrefix(prefixedPubKey: string): string {
-  const cleaned = encode.removeHexPrefix(prefixedPubKey);
-  
-  // With parity prefix: 2 (prefix) + 64 (x) = 66 chars
-  // Without parity prefix: 64 chars (x only)
-  if ((cleaned.length > 64 && cleaned.length <= 66) && (cleaned.slice(0, 2) === "02" || cleaned.slice(0, 2) === "03")) {
-    return encode.addHexPrefix(cleaned.slice(2));
-  }
-  
-  return encode.addHexPrefix(cleaned);
-}
-
-export function starkKeyToFullPublicKey3 (publicKeyWithParity: string): string {
-  const starkKey = removePubKeyPrefix(publicKeyWithParity);
-  const parity = encode.removeHexPrefix(publicKeyWithParity).slice(0, 2);
-  const myPoint = ec.starkCurve.ProjectivePoint.fromHex(parity + encode.removeHexPrefix(num.toHex64(starkKey)));
-
-  const coord = myPoint.toRawBytes(false);
-  const fullPublicKey: string = encode.addHexPrefix(bytesToHex(coord));
-  return fullPublicKey;
+  const yHex = y.toString(16).padStart(64, "0");
+  return "0x04" + xHex + yHex;
 }
 
 /**
@@ -416,7 +401,7 @@ function sqrtMod(n: bigint, p: bigint): bigint {
     while (t2i !== 1n) {
       t2i = modPow(t2i, 2n, p);
       i++;
-      if (i >= M) throw new Error('Tonelli–Shanks failed');
+      if (i >= M) throw new Error("Tonelli–Shanks failed");
     }
 
     // Compute b = c^(2^(M-i-1))
@@ -434,12 +419,12 @@ function sqrtMod(n: bigint, p: bigint): bigint {
 }
 
 export function normalizeAddress(address: string) {
-  if (typeof address !== 'string') {
-    throw new TypeError('Address must be a string');
+  if (typeof address !== "string") {
+    throw new TypeError("Address must be a string");
   }
 
   // Ensure it starts with "0x"
-  if (!address.startsWith('0x')) {
+  if (!address.startsWith("0x")) {
     throw new Error('Address must start with "0x"');
   }
 
@@ -447,11 +432,33 @@ export function normalizeAddress(address: string) {
   let hexPart = address.slice(2);
 
   // Remove unnecessary leading zeros but keep at least one '0'
-  hexPart = hexPart.replace(/^0+/, '') || '0';
+  hexPart = hexPart.replace(/^0+/, "") || "0";
 
   // Pad back to 64 characters
-  hexPart = hexPart.padStart(64, '0');
+  hexPart = hexPart.padStart(64, "0");
 
   // Ensure it starts with "0x0"
   return `0x0${hexPart.slice(1)}`; // Force the second character to be '0'
+}
+
+
+export function starkKeyToFullPublicKey2 (starkKey: string): string {
+    const myPoint1 = ec.starkCurve.ProjectivePoint.fromHex("02" + encode.removeHexPrefix(num.toHex64(starkKey)));
+    const myPoint2 = ec.starkCurve.ProjectivePoint.fromHex("03" + encode.removeHexPrefix(num.toHex64(starkKey)));
+
+    const y1 = num.toHex(myPoint1.y);
+    const y1bn = BigInt(myPoint1.y);
+
+    const y2 = num.toHex(myPoint2.y);
+    const y2bn = BigInt(myPoint2.y);
+
+    let coord: Uint8Array;
+    if (y1bn > y2bn) {
+        coord = myPoint1.toRawBytes(false);
+    } else {
+        coord = myPoint2.toRawBytes(false);
+    }
+
+    const pubKey: string = encode.addHexPrefix(bytesToHex(coord));
+    return pubKey;
 }
