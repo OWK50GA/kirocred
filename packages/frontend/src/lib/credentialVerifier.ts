@@ -16,7 +16,8 @@ import {
 } from '@/types/verification';
 import { StarknetClient } from './starknet';
 import { starkKeyToFullPublicKey3, truncateBit256 } from './utils';
-import { ec } from 'starknet';
+import { ec, RpcProvider } from 'starknet';
+import { ecdsa } from '@noble/curves/abstract/weierstrass.js';
 
 /**
  * Main credential verification function
@@ -79,8 +80,6 @@ export async function verifyCredential(
         errors.push('Invalid nonce format');
       }
 
-      // console.log(request.holderSignature, request.messageHash, request.holderEncryptionPublicKey);
-
       // console.log("Acc Sig: ", accSig)
       const bool = ec.starkCurve.verify(request.holderSignature, request.messageHash, starkKeyToFullPublicKey3(request.holderEncryptionPublicKey));
       // console.log("Pub key used: ", request.holderEncryptionPublicKey);
@@ -99,7 +98,14 @@ export async function verifyCredential(
       // The issuerSignedMessage should contain the signature over some message
       // We need to know: what message was signed? and how to parse the signature?
       // For now, mark as valid (placeholder)
-      checks.issuerSignatureValid = true;
+      const nodeUrl = starknetClient.providerUrl;
+      const provider = new RpcProvider({ nodeUrl })
+      
+      const signature = ec.starkCurve.Signature.fromCompact(request.issuerSignedMessage);
+      
+      const isValidSig = await provider.verifyMessageInStarknet(request.issuerMessageHash, signature, issuerAddress);
+      checks.issuerSignatureValid = isValidSig;
+      
       // console.log('Issuer signature verification skipped - needs implementation');
     } catch (error) {
       errors.push(`Failed to verify issuer signature: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -217,6 +223,7 @@ export async function verifyCredentialPackage(
     pathElements: packageData.pathElements,
     pathIndices: packageData.pathIndices,
     issuerSignedMessage: packageData.issuerSignedMessage,
+    issuerMessageHash: packageData.issuerMessageHash,
     // issuerAddress is now fetched from blockchain using batchId
     holderSignature: packageData.holderSignature,
     holderEncryptionPublicKey: packageData.holderPublicKey,

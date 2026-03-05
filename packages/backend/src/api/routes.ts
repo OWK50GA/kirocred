@@ -78,6 +78,7 @@ router.post(
         credentialId: requestData.credentialId,
         attributes: requestData.attributes,
         issuerSignedMessage: requestData.issuerSignedMessage,
+        issuerMessageHash: requestData.issuerMessageHash
       };
 
       // Call credential issuance function
@@ -163,6 +164,7 @@ router.post(
           credentialId: cred.credentialId,
           attributes: cred.attributes,
           issuerSignedMessage: cred.issuerSignedMessage,
+          issuerMessageHash: cred.issuerMessageHash
         })),
         issuerAddress: requestData.issuerAddress,
         batchMetadata: {

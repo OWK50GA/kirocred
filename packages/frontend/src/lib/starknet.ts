@@ -6,6 +6,7 @@ import { KIROCREDABI } from './abi';
 export class StarknetClient {
   private provider: Provider;
   private contract: Contract;
+  providerUrl: string;
 
   constructor(contractAddress: string, providerUrl?: string) {
     if (!providerUrl) {
@@ -15,6 +16,7 @@ export class StarknetClient {
     this.provider = new Provider({
       nodeUrl: providerUrl || 'https://rpc.starknet-testnet.lava.build/rpc/v0_9'
     });
+    this.providerUrl = providerUrl;
     
     // this.contract = new Contract(KIROCREDABI, contractAddress, this.provider);
     this.contract = new Contract({
@@ -44,6 +46,7 @@ export class StarknetClient {
       throw new Error(`Failed to get merkle root for batch ${batchId}: ${error}`);
     }
   }
+
   /**
    * Get issuer address for a batch (returns organization address as hex)
    */

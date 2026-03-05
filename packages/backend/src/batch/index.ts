@@ -18,6 +18,7 @@ export interface CredentialData {
   holderPublicKey: string;
   attributes: Record<string, any>;
   issuerSignedMessage: string;
+  issuerMessageHash: string;
   // Note: issuerAddress is now obtained from the connected wallet, not from credential data
 }
 
@@ -174,6 +175,7 @@ export interface CredentialPackage {
 
   // Signatures
   issuerSignedMessage: string; // Issuer's signature
+  issuerMessageHash: string;
   holderPublicKey: string;
 
   // Salts for selective disclosure
@@ -258,6 +260,7 @@ export function processBatch(
 
       // Signatures
       issuerSignedMessage: originalCredential.issuerSignedMessage,
+      issuerMessageHash: originalCredential.issuerMessageHash,
       holderPublicKey: issuedCredential.holderPublicKey,
 
       // Salts for selective disclosure
@@ -275,9 +278,10 @@ export function processBatch(
     issuedCredentials,
   };
 }
+
 import { IPFSClient } from "../ipfs/index";
 import { BlockchainClient } from "../blockchain/index";
-import { byteArray, RpcProvider } from "starknet";
+import { RpcProvider } from "starknet";
 import { getDatabase } from "../db";
 
 /**
@@ -340,9 +344,7 @@ export async function storeBatchAndPublish(
         // Store encrypted package to IPFS
         credentialPackage.batchId = batchIdNumber;
         credentialPackage.holderPublicKey = removePubKeyPrefix(credentialPackage.holderPublicKey);
-        const ipfsCid = await ipfsClient.storePackage({
-
-        });
+        const ipfsCid = await ipfsClient.storePackage(credentialPackage);
 
         credentialCIDs.push({
           credentialId: credentialPackage.credentialId,

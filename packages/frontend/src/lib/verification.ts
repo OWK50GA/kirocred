@@ -133,7 +133,8 @@ export function verifyMerkleProof(
       console.log("Single leaf tree - Leaf:", leaf);
       console.log("Expected root (original):", expectedRoot);
       console.log("Expected root (hex):", expectedRootHex);
-      return truncateBit256(leaf) === expectedRootHex;
+      console.log("Calculated: ", truncateBit256(leaf));
+      return BigInt(truncateBit256(leaf)) === BigInt(expectedRootHex);
     }
     
     let currentHash = leaf;
@@ -152,13 +153,10 @@ export function verifyMerkleProof(
       }
     }
 
-    // const cleanCalculatedHash = currentHash.startsWith('0x') ? currentHash.slice(2) : currentHash;
-    // const slicedCleanCalculatedHash = cleanCalculatedHash.slice(0, 60);
-    // const calculatedHash = `0x${slicedCleanCalculatedHash}`;
     const calculatedHash = truncateBit256(currentHash);
     console.log("Calculated root: ", calculatedHash)
     
-    return normalizeAddress(calculatedHash) === normalizeAddress(expectedRootHex);
+    return BigInt(normalizeAddress(calculatedHash)) === BigInt(normalizeAddress(expectedRootHex));
   } catch (error) {
     console.error('Error verifying merkle proof:', error);
     return false;

@@ -7,7 +7,7 @@ import { FormCard } from '@/components/FormCard'
 import { StatusIndicator } from '@/components/StatusIndicator'
 import AddCredentialForm, { Credential } from '@/components/AddCredentialForm'
 import BatchProcessForm from '@/components/BatchProcessForm'
-import BatchResult from '@/components/BatchResult'
+// import BatchResult from '@/components/BatchResult'
 import { cn } from '@/lib/utils'
 import { useAccount } from '@starknet-react/core'
 import { StarknetClient } from '@/lib/starknet'
@@ -116,7 +116,7 @@ export default function IssuerPage() {
               </p>
             </div>
 
-            <BatchResult result={batchResult} onDownloadPackages={handleDownloadPackages} />
+            {/* <BatchResult result={batchResult} onDownloadPackages={handleDownloadPackages} /> */}
 
             <div className="text-center mt-6 space-x-4">
               <button
