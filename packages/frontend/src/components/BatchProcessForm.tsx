@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useAccount, useSignTypedData } from '@starknet-react/core';
+import { ArraySignatureType, ec, stark, WeierstrassSignatureType } from 'starknet';
+import { weierstrass } from '@noble/curves/abstract/weierstrass.js';
 
 interface Credential {
   holderPublicKey: string;
@@ -25,6 +27,7 @@ export default function BatchProcessForm({ credentials, onBatchProcessed }: Batc
   const [error, setError] = useState<string | null>(null);
   const { signTypedDataAsync } = useSignTypedData({})
   const { account } = useAccount();
+  const [issuerMessageHash, setIssuerMessageHash] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -73,10 +76,18 @@ export default function BatchProcessForm({ credentials, onBatchProcessed }: Batc
         },
       };
 
-      const messageHash = account?.hashMessage(batchTypedData);
+      const messageHash = await account?.hashMessage(batchTypedData);
 
       const issuerSignedMessage = await signTypedDataAsync(batchTypedData);
+      console.log("issuerSignedMessage: ", issuerSignedMessage);
 
+      const formattedSignature = stark.formatSignature([issuerSignedMessage[1], issuerSignedMessage[2]]);
+      console.log("Formatted signature: ", formattedSignature);
+      
+      const signature = new ec.starkCurve.Signature(BigInt(formattedSignature[0]), BigInt(formattedSignature[1]));
+      console.log("Signature: ", signature);
+      const hexSig = signature.toCompactHex();
+      console.log("Hex signature: ", hexSig);
 
       const requestBody = {
         batchId,
@@ -85,7 +96,7 @@ export default function BatchProcessForm({ credentials, onBatchProcessed }: Batc
             holderPublicKey: cred.holderPublicKey,
             credentialId: cred.credentialId,
             attributes: cred.attributes,
-            issuerSignedMessage,
+            issuerSignedMessage: hexSig,
             issuerMessageHash: messageHash
           })
         }),

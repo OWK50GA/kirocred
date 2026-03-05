@@ -7,10 +7,11 @@ import { FormCard } from '@/components/FormCard'
 import { StatusIndicator } from '@/components/StatusIndicator'
 import AddCredentialForm, { Credential } from '@/components/AddCredentialForm'
 import BatchProcessForm from '@/components/BatchProcessForm'
-import BatchResult from '@/components/BatchResult'
+// import BatchResult from '@/components/BatchResult'
 import { cn } from '@/lib/utils'
 import { useAccount } from '@starknet-react/core'
 import { StarknetClient } from '@/lib/starknet'
+import BatchResult from '@/components/BatchResult'
 
 export default function IssuerPage() {
   const [credentials, setCredentials] = useState<Credential[] | Omit<Credential, 'issuerSignedMessage' | 'issuerMessageHash'>[]>([])

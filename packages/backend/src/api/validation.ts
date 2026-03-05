@@ -16,6 +16,7 @@ export interface ProcessBatchRequest {
     credentialId: string;
     attributes: Record<string, any>;
     issuerSignedMessage: string;
+    issuerMessageHash: string;
   }>;
   issuerAddress: string;
   batchMetadata: {
@@ -180,6 +181,11 @@ export function validateProcessBatchRequest(data: any): {
       ) {
         errors.push(
           `credentials[${index}].issuerSignedMessage is required and must be a string`,
+        );
+      }
+      if (!cred.issuerMessageHash) {
+        errors.push(
+          `credentials[${index}].issuerMessageHash is required and must be a string`,
         );
       }
 

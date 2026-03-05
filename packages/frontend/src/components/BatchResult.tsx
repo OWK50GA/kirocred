@@ -73,7 +73,7 @@ export default function BatchResult({ result, onDownloadPackages }: BatchResultP
         </div>
       </FormCard>
 
-      <div className="flex gap-4">
+      {/* <div className="flex gap-4">
         <button
           onClick={onDownloadPackages}
           className="flex-1 py-2.5 rounded-lg font-medium transition-all bg-[#00D9FF] text-black hover:bg-[#00BBFF] flex items-center justify-center gap-2"
@@ -81,7 +81,7 @@ export default function BatchResult({ result, onDownloadPackages }: BatchResultP
           <span>📥</span>
           Download Credential Packages
         </button>
-      </div>
+      </div> */}
 
       <div className="p-4 bg-[#A855F7]/10 border border-[#A855F7]/30 rounded-lg">
         <div className="flex items-start gap-3">
