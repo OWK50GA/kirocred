@@ -11,8 +11,6 @@ import {
   verifyIssuerSignature,
 } from "./index";
 import { BigNumberish, ec, hash, stark } from "starknet";
-import crypto from "crypto";
-import { json } from "stream/consumers";
 
 describe("Crypto Module", () => {
   describe("Hash Functions", () => {

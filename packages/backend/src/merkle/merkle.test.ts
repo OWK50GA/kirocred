@@ -1,5 +1,5 @@
 import { buildTree, getRoot, getProof, verifyProof, MerkleTree } from "./index";
-import crypto from "crypto";
+
 
 // Helper to generate test commitment hashes
 function generateCommitment(data: string): string {

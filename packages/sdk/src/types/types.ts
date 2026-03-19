@@ -12,3 +12,4 @@ export type BatchProof = {
   root: HexString;
   proofs: Record<string, MerkleProof>; // map credentialId -> proof
 };
+

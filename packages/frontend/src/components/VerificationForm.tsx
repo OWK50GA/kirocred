@@ -6,7 +6,6 @@ import { CompactVerificationPackage } from '@/types/verification';
 import WalletConnect from './WalletConnect';
 import { deriveEncryptionKeypair, createKeyDerivationTypedData } from '@/lib/encryptionKeys';
 import { ec, typedData } from 'starknet';
-// import { getFullPublicKeyFromSignature } from '@/lib/utils';
 
 interface VerificationFormProps {
   onSubmit: (packageData: CompactVerificationPackage) => void;
@@ -103,23 +102,12 @@ export default function VerificationForm({ onSubmit, isLoading }: VerificationFo
       // Get message hash from typed data
       const msgHash = typedData.getMessageHash(nonceTypedData, address!);
       setMessageHash(msgHash);
-
-      // Sign with encryption private key using raw starknet.js
-      // Remove 0x prefix if present
-      const privateKeyHex = encryptionPrivateKey.startsWith('0x') 
-        ? encryptionPrivateKey.slice(2) 
-        : encryptionPrivateKey;
       
       // Use ec.starkCurve.sign with the message hash and private key
-      const signature = ec.starkCurve.sign(msgHash, privateKeyHex);
+      const signature = ec.starkCurve.sign(msgHash, encryptionPrivateKey);
 
       console.log("From nonce signing: ", signature);
 
-      // Convert signature to string array format
-      // setHolderSignature([
-      //   '0x' + signature.r.toString(16),
-      //   '0x' + signature.s.toString(16)
-      // ]);
       setHolderSignature(signature)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to sign nonce');
@@ -167,10 +155,6 @@ export default function VerificationForm({ onSubmit, isLoading }: VerificationFo
       if (!Array.isArray(parsedPackage.pathElements) || !Array.isArray(parsedPackage.pathIndices)) {
         throw new Error('pathElements and pathIndices must be arrays');
       }
-
-      // if (parsedPackage.holderPublicKey.length <= 65) {
-      //   parsedPackage.holderPublicKey = getFullPublicKeyFromSignature(holderSignature, messageHash);
-      // }
 
       // Add holder signature and nonce to package
       const packageWithSignature = {

@@ -19,7 +19,6 @@ export interface CredentialData {
   attributes: Record<string, any>;
   issuerSignedMessage: string;
   issuerMessageHash: string;
-  // Note: issuerAddress is now obtained from the connected wallet, not from credential data
 }
 
 /**

@@ -5,7 +5,6 @@ import { Header } from '@/components/Header'
 import { RoleCard } from '@/components/RoleCard'
 import { useAccount, useSignTypedData } from '@starknet-react/core'
 import { deriveEncryptionKeypair, createKeyDerivationTypedData } from '@/lib/encryptionKeys'
-import { compressPublicKey } from '@/lib/utils'
 import { CopyButton } from '@/components/CopyButton'
 
 function GetKirocredKeyButton() {

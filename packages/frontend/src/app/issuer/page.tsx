@@ -5,16 +5,16 @@ import { Header } from '@/components/Header'
 import { OrganizationRegistration } from '@/components/OrganizationRegistration'
 import { FormCard } from '@/components/FormCard'
 import { StatusIndicator } from '@/components/StatusIndicator'
-import AddCredentialForm, { Credential } from '@/components/AddCredentialForm'
+import AddCredentialForm from '@/components/AddCredentialForm'
 import BatchProcessForm from '@/components/BatchProcessForm'
-// import BatchResult from '@/components/BatchResult'
 import { cn } from '@/lib/utils'
 import { useAccount } from '@starknet-react/core'
 import { StarknetClient } from '@/lib/starknet'
 import BatchResult from '@/components/BatchResult'
+import { CredentialData } from '@/types/verification'
 
 export default function IssuerPage() {
-  const [credentials, setCredentials] = useState<Credential[] | Omit<Credential, 'issuerSignedMessage' | 'issuerMessageHash'>[]>([])
+  const [credentials, setCredentials] = useState<CredentialData[] | Omit<CredentialData, 'issuerSignedMessage' | 'issuerMessageHash'>[]>([])
   const [batchResult, setBatchResult] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<'add' | 'batch'>('add')
   const [isRegistered, setIsRegistered] = useState(false)
@@ -49,7 +49,7 @@ export default function IssuerPage() {
     checkOrgRegistration();
   }, [address])
 
-  const handleCredentialAdded = (credential: Credential | Omit<Credential, 'issuerSignedMessage' | 'issuerMessageHash'>) => {
+  const handleCredentialAdded = (credential: CredentialData | Omit<CredentialData, 'issuerSignedMessage' | 'issuerMessageHash'>) => {
     setCredentials(prev => [...prev, credential])
   }
 

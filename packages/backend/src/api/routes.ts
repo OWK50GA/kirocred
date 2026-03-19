@@ -416,9 +416,9 @@ router.post(
   }),
 );
 
-// GET /api/credentials/holder/:address endpoint
+// GET /api/organizations/holder/:address endpoint
 router.get(
-  "/credentials/holder/:address",
+  "/organizations/holder/:address",
   asyncHandler(async (req: Request, res: Response) => {
     const { address } = req.params;
 
@@ -434,12 +434,66 @@ router.get(
     try {
       const db = await getDatabase();
       
-      // Get all credentials for this holder with org info
-      const credentials = await db.getCredentialsByHolder(address);
+      // Get organizations where this holder has credentials
+      const organizations = await db.getOrganizationsByHolder(address);
 
       res.status(200).json({
         success: true,
         holderAddress: address,
+        organizations: organizations.map(org => ({
+          orgId: org.org_id,
+          orgName: org.org_name,
+        })),
+        count: organizations.length,
+      });
+    } catch (error) {
+      console.error("Error fetching organizations for holder:", error);
+
+      // Generic error response
+      res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+        message: "Failed to fetch organizations",
+      });
+    }
+  }),
+);
+
+// GET /api/credentials/holder/:address/org/:orgId endpoint
+router.get(
+  "/credentials/holder/:address/org/:orgId",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { address, orgId } = req.params;
+
+    // Validate address format
+    if (!address || typeof address !== 'string' || !address.startsWith('0x')) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation Error",
+        message: "Invalid holder address format",
+      });
+    }
+
+    // Validate orgId
+    const orgIdNum = parseInt(orgId as string, 10);
+    if (isNaN(orgIdNum)) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation Error",
+        message: "Invalid organization ID format",
+      });
+    }
+
+    try {
+      const db = await getDatabase();
+      
+      // Get credentials for this holder from the specific organization
+      const credentials = await db.getCredentialsByHolderAndOrg(address, orgIdNum);
+
+      res.status(200).json({
+        success: true,
+        holderAddress: address,
+        orgId: orgIdNum,
         credentials: credentials.map(cred => ({
           credentialId: cred.credential_id,
           ipfsCid: cred.ipfs_cid,
@@ -450,7 +504,7 @@ router.get(
         count: credentials.length,
       });
     } catch (error) {
-      console.error("Error fetching credentials for holder:", error);
+      console.error("Error fetching credentials for holder and org:", error);
 
       // Generic error response
       res.status(500).json({
@@ -523,6 +577,122 @@ router.get(
         success: false,
         error: "Internal Server Error",
         message: "Failed to fetch batches",
+      });
+    }
+  }),
+);
+
+router.get(
+  "/batches/orgs/:orgId",
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const { orgId } = req.params;
+      const db = await getDatabase();
+      
+      // Get all batches with org info and credential count
+      const batches = await db.getAllBatches();
+
+      const orgBatches = batches.filter((org) =>
+        org.org_id.toString() === orgId as string
+      )
+
+      res.status(200).json({
+        success: true,
+        batches: orgBatches.map(batch => ({
+          batchId: batch.batch_id,
+          orgId: batch.org_id,
+          orgName: batch.org_name,
+          credentialCount: batch.credential_count,
+        })),
+        count: orgBatches.length,
+      });
+    } catch (error) {
+      console.error("Error fetching all batches:", error);
+
+      // Generic error response
+      res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+        message: "Failed to fetch batches",
+      });
+    }
+  }),
+);
+
+// GET /api/organizations/all endpoint - for verifiers to see all organizations
+router.get(
+  "/organizations/all",
+  asyncHandler(async (req: Request, res: Response) => {
+    try {
+      const db = await getDatabase();
+      
+      // Get all organizations with credential count
+      const organizations = await db.getAllOrganizations();
+
+      res.status(200).json({
+        success: true,
+        organizations: organizations.map(org => ({
+          orgId: org.org_id,
+          orgName: org.org_name,
+          credentialCount: org.credential_count,
+        })),
+        count: organizations.length,
+      });
+    } catch (error) {
+      console.error("Error fetching all organizations:", error);
+
+      // Generic error response
+      res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+        message: "Failed to fetch organizations",
+      });
+    }
+  }),
+);
+
+// GET /api/credentials/org/:orgId endpoint - for verifiers to see credentials by organization
+router.get(
+  "/credentials/org/:orgId",
+  asyncHandler(async (req: Request, res: Response) => {
+    const { orgId } = req.params;
+
+    // Validate orgId
+    const orgIdNum = parseInt(orgId as string, 10);
+    if (isNaN(orgIdNum) || orgIdNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        error: "Validation Error",
+        message: "Invalid organization ID",
+      });
+    }
+
+    try {
+      const db = await getDatabase();
+      
+      // Get credentials for the organization
+      const credentials = await db.getCredentialsByOrg(orgIdNum);
+
+      res.status(200).json({
+        success: true,
+        orgId: orgIdNum,
+        credentials: credentials.map(cred => ({
+          credentialId: cred.credential_id,
+          batchId: cred.batch_id,
+          holderAddress: cred.holder_address,
+          ipfsCid: cred.ipfs_cid,
+          orgName: cred.org_name,
+        })),
+        count: credentials.length,
+      });
+    } catch (error) {
+      console.error("Error fetching credentials for organization:", error);
+
+      // Generic error response
+      res.status(500).json({
+        success: false,
+        error: "Internal Server Error",
+        message: "Failed to fetch credentials",
       });
     }
   }),
