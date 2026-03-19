@@ -4,7 +4,7 @@ import StarknetProvider from '@/components/StarknetProvider';
 
 export const metadata: Metadata = {
   title: 'Kirocred Verifier',
-  description: 'Zero-knowledge credential verification system',
+  description: 'Privacy preserving credential verification system',
 };
 
 export default function RootLayout({

@@ -1,9 +1,11 @@
-import crypto from 'crypto'
 import cryptojs from 'crypto-js'
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { ec, encode, num, WeierstrassSignatureType } from 'starknet'
-import { bytesToHex } from "@noble/curves/utils.js"
+import { ec, encode, num } from 'starknet'
+import { sha256 } from "@noble/hashes/sha2.js";
+import { randomBytes, bytesToHex, hexToBytes } from "@noble/hashes/utils.js";
+import { gcm } from "@noble/ciphers/aes.js";
+import { bytesToUtf8, utf8ToBytes } from "@noble/ciphers/utils.js";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -218,4 +220,74 @@ export function starkKeyToFullPublicKey3 (publicKeyWithParity: string): string {
   const coord = myPoint.toRawBytes(false);
   const fullPublicKey: string = encode.addHexPrefix(bytesToHex(coord));
   return fullPublicKey;
+}
+
+export function decryptKeyFromHolder(
+  encryptedKey: string,
+  holderPrivateKey: string,
+): Uint8Array {
+  const encryptedBuffer = hexToBytes(encode.removeHexPrefix(encryptedKey));
+
+  const ephemeralPublicKeyHex = bytesToHex(encryptedBuffer.subarray(0, 65))
+  const iv = encryptedBuffer.subarray(65, 77);
+  const authTag = encryptedBuffer.subarray(77, 93);
+  const ciphertext = encryptedBuffer.subarray(93);
+
+  // Derive decryption key using holder's private key and ephemeral public key
+  // Must match encryption derivation
+  // const combined = holderPrivateKey + ephemeralPublicKey;
+  // Compute shared secret: holderPriv * ephemeralPub
+  const sharedSecret = ec.starkCurve.getSharedSecret(
+    holderPrivateKey,
+    ephemeralPublicKeyHex,
+  );
+
+  const derivedKey = sha256(sharedSecret);
+  // const derivedKey = crypto.createHash('sha256').update(combined).digest();
+
+  const combined = concatBytes(ciphertext, authTag);
+  // Decrypt the AES key
+  const decipher = gcm(derivedKey, iv);
+
+  const decryptedKey = decipher.decrypt(combined);
+//   decryptedKey = Buffer.concat([decryptedKey, decipher.final()]);
+
+  return decryptedKey;
+}
+
+export function decryptAttributes(
+  ciphertext: string,
+  key: Uint8Array,
+  iv: string,
+  authTag: string,
+): Record<string, any> {
+  if (!(key instanceof Uint8Array) || key.length !== 32) {
+    throw new Error("Key must be a 32-byte Uint8Array");
+  }
+
+  const ciphertextBytes = hexToBytes(ciphertext);
+  const authTagBytes = hexToBytes(authTag);
+  const ivBytes = hexToBytes(iv);
+
+  const combined = new Uint8Array(ciphertextBytes.length + authTagBytes.length);
+  combined.set(ciphertextBytes, 0);
+  combined.set(authTagBytes, ciphertextBytes.length);
+
+  const decipher = gcm(key, ivBytes);
+  const plaintextBytes = decipher.decrypt(combined);
+
+  const plaintext = bytesToUtf8(plaintextBytes);
+
+  return JSON.parse(plaintext);
+}
+
+export function concatBytes(...arrays: any[]) {
+  const totalLength = arrays.reduce((sum, arr) => sum + arr.length, 0);
+  const result = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const arr of arrays) {
+    result.set(arr, offset);
+    offset += arr.length;
+  }
+  return result;
 }

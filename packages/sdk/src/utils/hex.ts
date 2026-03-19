@@ -1,13 +1,3 @@
-// export function bytesToHex(bytes: Uint8Array): string {
-//   return '0x' + Buffer.from(bytes).toString('hex');
-// }
-
-// export function hexToBytes(hex: string): Uint8Array {
-//   const s = hex.startsWith('0x') ? hex.slice(2) : hex;
-//   if (s.length % 2 !== 0) throw new Error('Invalid hex length');
-//   return Uint8Array.from(Buffer.from(s, 'hex'));
-// }
-
 /** BigInt -> 0x hex (no fixed width) */
 export function bigintToHex(n: bigint): string {
   return "0x" + n.toString(16);

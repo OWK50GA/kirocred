@@ -165,27 +165,12 @@ export function encryptKeyToHolder(
   // Encrypt the AES key using derived key
   const iv = randomBytes(12); //96-bit IV
   const cipher = gcm(derivedKey, iv);
-  //   const cipher = crypto.createCipheriv("aes-256-gcm", derivedKey, iv);
   const encryptedKeyWithTag = cipher.encrypt(key);
 
   const authTag = encryptedKeyWithTag.slice(-16);
   const encryptedKey = encryptedKeyWithTag.slice(0, -16);
 
-//   const totalLength =
-//     ephemeralPublicKeyFull.length +
-//     iv.length +
-//     authTag.length +
-//     encryptedKey.length;
-
   const result = concatBytes(ephemeralPublicKeyBytes, iv, authTag, encryptedKey);
-//   let offset = 0;
-//   result.set(ephemeralPublicKeyFull, offset);
-//   offset += ephemeralPublicKeyFull.length;
-//   result.set(iv, offset);
-//   offset += iv.length;
-//   result.set(authTag, offset);
-//   offset += authTag.length;
-//   result.set(encryptedKey, offset);
 
   return "0x" + bytesToHex(result);
 }
@@ -201,12 +186,9 @@ export function decryptKeyFromHolder(
   encryptedKey: string,
   holderPrivateKey: string,
 ): Uint8Array {
-//   const encryptedBuffer = Buffer.from(encryptedKey.slice(2), "hex");
-    const encryptedBuffer = hexToBytes(encryptedKey.slice(2));
+  const encryptedBuffer = hexToBytes(encode.removeHexPrefix(encryptedKey));
 
-  // Parse components: ephemeralPublicKey (32 bytes) || iv (12 bytes) || authTag (16 bytes) || encryptedKey
-//   const ephemeralPublicKeyHex = encryptedBuffer.subarray(0, 65).toString("hex");
-    const ephemeralPublicKeyHex = bytesToHex(encryptedBuffer.subarray(0, 65))
+  const ephemeralPublicKeyHex = bytesToHex(encryptedBuffer.subarray(0, 65))
   const iv = encryptedBuffer.subarray(65, 77);
   const authTag = encryptedBuffer.subarray(77, 93);
   const ciphertext = encryptedBuffer.subarray(93);

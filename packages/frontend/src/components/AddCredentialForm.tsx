@@ -3,15 +3,9 @@
 import { starkKeyToFullPublicKey } from '@/lib/utils';
 import { useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { CredentialData } from '@/types/verification'
 
 // Types
-export interface Credential {
-  credentialId: string;
-  holderPublicKey: string;
-  attributes: Record<string, any>;
-  issuerSignedMessage: string;
-  issuerMessageHash: string;
-}
 
 interface AttributeField {
   key: string;
@@ -26,7 +20,7 @@ interface FormData {
 }
 
 interface AddCredentialFormProps {
-  onCredentialAdded: (credential: Credential | Omit<Credential, 'issuerSignedMessage' | 'issuerMessageHash'>) => void;
+  onCredentialAdded: (credential: CredentialData | Omit<CredentialData, 'issuerSignedMessage' | 'issuerMessageHash'>) => void;
 }
 
 function NestedFieldsEditor({
@@ -235,7 +229,7 @@ export default function AddCredentialForm({ onCredentialAdded }: AddCredentialFo
       // const message = `credential:${credentialId}:${formData.holderPublicKey}`;
       // const issuerSignedMessage = message; // Placeholder - should be actual signature
 
-      const credential: Omit<Credential, 'issuerSignedMessage' | 'issuerMessageHash'> = {
+      const credential: Omit<CredentialData, 'issuerSignedMessage' | 'issuerMessageHash'> = {
         credentialId,
         holderPublicKey: formData.holderPublicKey.trim(),
         attributes,

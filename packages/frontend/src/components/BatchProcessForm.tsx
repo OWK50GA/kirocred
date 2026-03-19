@@ -4,17 +4,10 @@ import { useState } from 'react';
 import { useAccount, useSignTypedData } from '@starknet-react/core';
 import { ArraySignatureType, ec, stark, WeierstrassSignatureType } from 'starknet';
 import { weierstrass } from '@noble/curves/abstract/weierstrass.js';
-
-interface Credential {
-  holderPublicKey: string;
-  credentialId: string;
-  attributes: Record<string, any>;
-  issuerSignedMessage: string;
-  issuerMessageHash: string;
-}
+import { CredentialData } from '@/types/verification'
 
 interface BatchProcessFormProps {
-  credentials: Credential[] | Omit<Credential, 'issuerSignedMessage' | 'issuerMessageHash'>[];
+  credentials: CredentialData[] | Omit<CredentialData, 'issuerSignedMessage' | 'issuerMessageHash'>[];
   onBatchProcessed: (result: any) => void;
 }
 

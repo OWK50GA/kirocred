@@ -3,10 +3,10 @@
 import { useEffect, useState } from 'react';
 import { useAccount, useSignTypedData } from '@starknet-react/core';
 import { deriveEncryptionKeypair, createKeyDerivationTypedData } from '@/lib/encryptionKeys';
-import { ec, hash, num, stark, typedData } from 'starknet';
-import { compressPublicKey, hexToUint8Array, normalizeAddress, removePubKeyPrefix, starkKeyToFullPublicKey, starkKeyToFullPublicKey3 } from '@/lib/utils';
-import { feltToHex } from '@/lib/verification';
+import { ec, hash } from 'starknet';
+import { decryptAttributes, decryptKeyFromHolder, removePubKeyPrefix } from '@/lib/utils';
 import QRGenerator from './QRGenerator';
+import WalletConnect from './WalletConnect';
 import { CopyButton } from './CopyButton';
 
 interface CredentialInfo {
@@ -19,7 +19,6 @@ interface CredentialInfo {
 
 export default function ProveForm() {
   const [packageJson, setPackageJson] = useState('');
-  // const [qrPackageJson, setQrPackageJson] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [encryptionPrivateKey, setEncryptionPrivateKey] = useState<string | null>(null);
   const [encryptionPublicKey, setEncryptionPublicKey] = useState<string | null>(null);
@@ -35,26 +34,90 @@ export default function ProveForm() {
   const [selectedCredential, setSelectedCredential] = useState<CredentialInfo | null>(null);
   const [isLoadingPackage, setIsLoadingPackage] = useState(false);
   const [activeTab, setActiveTab] = useState<'qr' | 'manual'>('qr');
+  const [revealKeys, setRevealKeys] = useState<string[]>([])
+
+  const [selectedRevealKeys, setSelectedRevealKeys] = useState<string[]>([]);
+  const [organizations, setOrganizations] = useState<Array<{ orgId: number; orgName: string | null }>>([]);
+  const [isLoadingOrganizations, setIsLoadingOrganizations] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState<{ orgId: number; orgName: string | null } | null>(null);
 
   const { address, isConnected } = useAccount();
   const { signTypedDataAsync } = useSignTypedData({});
 
-  // Fetch credentials when encryption public key is derived
+  const resetAll = () => {
+    setPackageJson('');
+    setError(null);
+    setEncryptionPrivateKey(null);
+    setEncryptionPublicKey(null);
+    setHolderSignature('');
+    setMessageHash('');
+    setNonce('');
+    setIsDeriving(false);
+    setIsSigning(false);
+    setProofPackage(null);
+    setQrProofPackage(null);
+    setCredentials([]);
+    setIsLoadingCredentials(false);
+    setSelectedCredential(null);
+    setIsLoadingPackage(false);
+    setActiveTab('qr');
+    setRevealKeys([]);
+    setSelectedRevealKeys([]);
+    setOrganizations([]);
+    setIsLoadingOrganizations(false);
+    setSelectedOrg(null);
+  };
+
+  // Fetch organizations when encryption public key is derived
   useEffect(() => {
     if (encryptionPublicKey && address) {
-      fetchCredentials(encryptionPublicKey);
+      fetchOrganizations(encryptionPublicKey);
     }
   }, [encryptionPublicKey, address]);
 
-  const fetchCredentials = async (pubKey: string) => {
+  const fetchOrganizations = async (pubKey: string) => {
+    setIsLoadingOrganizations(true);
+    setError(null);
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/organizations/holder/${pubKey}`);
+      const response2 = await fetch(`${backendUrl}/api/organizations/holder/${removePubKeyPrefix(pubKey)}`);
+      
+      if (!response.ok || !response2.ok) {
+        throw new Error('Failed to fetch organizations');
+      }
+
+      const data = await response.json();
+      const data2 = await response2.json();
+      
+      if (data.success) {
+        const combinedOrgs = [...data.organizations, ...data2.organizations];
+        // Remove duplicates
+        const uniqueOrgs = combinedOrgs.filter((org, index, self) =>
+          index === self.findIndex(o => o.orgId === org.orgId)
+        );
+        setOrganizations(uniqueOrgs);
+      } else {
+        throw new Error(data.message || 'Failed to fetch organizations');
+      }
+    } catch (err) {
+      console.error('Error fetching organizations:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch organizations');
+    } finally {
+      setIsLoadingOrganizations(false);
+    }
+  };
+
+  const fetchCredentials = async (pubKey: string, orgId: number) => {
 
     setIsLoadingCredentials(true);
     setError(null);
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-      const response = await fetch(`${backendUrl}/api/credentials/holder/${pubKey}`);
-      const response2 = await fetch(`${backendUrl}/api/credentials/holder/${removePubKeyPrefix(pubKey)}`)
+      const response = await fetch(`${backendUrl}/api/credentials/holder/${pubKey}/org/${orgId}`);
+      const response2 = await fetch(`${backendUrl}/api/credentials/holder/${removePubKeyPrefix(pubKey)}/org/${orgId}`);
       
       if (!response.ok || !response2.ok) {
         throw new Error('Failed to fetch credentials');
@@ -64,8 +127,7 @@ export default function ProveForm() {
       const data2 = await response2.json();
       
       if (data.success) {
-        setCredentials(data.credentials);
-        setCredentials((prev) => [...prev, ...data2.credentials]);
+        setCredentials([...data.credentials, ...data2.credentials]);
       } else {
         throw new Error(data.message || 'Failed to fetch credentials');
       }
@@ -91,6 +153,10 @@ export default function ProveForm() {
 
       const packageData = await response.json();
       setPackageJson(JSON.stringify(packageData, null, 2));
+      const salts = packageData.attributeSalts;
+      const saltKeys = Object.keys(salts);
+      setRevealKeys(saltKeys);
+      setSelectedRevealKeys([]);
       setSelectedCredential(credential);
     } catch (err) {
       console.error('Error fetching credential package:', err);
@@ -186,22 +252,6 @@ export default function ProveForm() {
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setError(null);
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const content = event.target?.result as string;
-      setPackageJson(content);
-    };
-    reader.onerror = () => {
-      setError('Failed to read file');
-    };
-    reader.readAsText(file);
-  };
-
   const handleGenerateProof = () => {
     setError(null);
 
@@ -213,6 +263,27 @@ export default function ProveForm() {
     try {
       const parsedPackage = JSON.parse(packageJson);
 
+      if (selectedRevealKeys.length > 0) {
+        parsedPackage["reveals"] = {};
+
+        const decryptedKey = decryptKeyFromHolder(parsedPackage.encryptedKey, encryptionPrivateKey!);
+        console.log(decryptedKey);
+
+        const attributes = decryptAttributes(
+          parsedPackage.encryptedAttributes.ciphertext, decryptedKey, parsedPackage.encryptedAttributes.iv, parsedPackage.encryptedAttributes.authTag
+        )
+
+        console.log(attributes);
+        const attrsKeys = selectedRevealKeys.length > 0 ? selectedRevealKeys : Object.keys(attributes);
+
+        attrsKeys.forEach((key) => {
+          const value = attributes[key];
+          if (value !== undefined) {
+            parsedPackage["reveals"][key] = value;
+          }
+        })
+      }
+
       if (parsedPackage.holderPublicKey !== encryptionPublicKey && parsedPackage.holderPublicKey !== removePubKeyPrefix(encryptionPublicKey)) {
         console.log(parsedPackage.holderPublicKey, encryptionPublicKey);
         throw new Error("Public keys do not match")
@@ -220,6 +291,7 @@ export default function ProveForm() {
 
       const qrProofData = {
         cid: selectedCredential?.ipfsCid,
+        reveals: parsedPackage.reveals,
         holderSignature,
         holderEncryptionPublicKey: encryptionPublicKey,
         holderPublicKey: encryptionPublicKey,
@@ -261,12 +333,30 @@ export default function ProveForm() {
 
   return (
     <div className="max-w-2xl mx-auto p-6 bg-gray-900 rounded-lg shadow-xl border border-gray-800">
-      <h2 className="text-2xl font-bold mb-6 text-white">Prepare Credential Proof</h2>
-      
+      <div className="flex items-start justify-between mb-6">
+        <h2 className="text-2xl font-bold text-white">Prepare Credential Proof</h2>
+        <button
+          onClick={resetAll}
+          className="px-3 py-1 text-xs font-semibold text-white bg-red-600 border border-red-700 rounded-lg hover:bg-red-700 transition-colors"
+        >
+          End
+        </button>
+      </div>
+
+      {!isConnected && (
+        <div className="mb-6 p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+          <h3 className="text-sm font-semibold mb-3 text-white">Step 1: Connect Wallet</h3>
+          <p className="text-xs text-gray-400 mb-3">
+            Connect your wallet to begin the proof generation flow.
+          </p>
+          <WalletConnect />
+        </div>
+      )}
+
       {/* Derive Encryption Key Section */}
       {isConnected && !encryptionPrivateKey && (
         <div className="mb-6 p-4 bg-purple-900/30 border border-purple-700/50 rounded-lg">
-          <h3 className="text-sm font-semibold mb-3 text-white">Step 1: Derive Encryption Key</h3>
+          <h3 className="text-sm font-semibold mb-3 text-white">Step 2: Derive Encryption Key</h3>
           <p className="text-xs text-gray-400 mb-3">
             Sign a message with your wallet to derive your encryption private key.
           </p>
@@ -280,13 +370,60 @@ export default function ProveForm() {
         </div>
       )}
 
-      {/* Credentials List Section */}
-      {encryptionPublicKey && !holderSignature && (
+      {/* Organizations List Section */}
+      {encryptionPublicKey && !selectedOrg && (
         <div className="mb-6 space-y-4">
           <div className="p-4 bg-blue-900/30 border border-blue-700/50 rounded-lg">
-            <h3 className="text-sm font-semibold mb-3 text-white">Step 2: Select Your Credential</h3>
+            <h3 className="text-sm font-semibold mb-3 text-white">Step 3: Select Organization</h3>
             <p className="text-xs text-gray-400 mb-3">
-              Choose the credential you want to prove from your list.
+              Choose the organization from which you want to prove a credential.
+            </p>
+            
+            {isLoadingOrganizations ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <p className="text-sm text-gray-400 mt-2">Loading your organizations...</p>
+              </div>
+            ) : organizations.length === 0 ? (
+              <div className="text-center py-8 bg-gray-800/50 rounded-lg">
+                <p className="text-gray-400">No organizations found for this encryption key.</p>
+                <p className="text-xs text-gray-500 mt-2">Make sure you have received credentials from an issuer.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {organizations.map((org) => (
+                  <button
+                    key={org.orgId}
+                    onClick={() => {
+                      setSelectedOrg(org);
+                      setCredentials([]);
+                      setError(null);
+                      fetchCredentials(encryptionPublicKey, org.orgId);
+                    }}
+                    disabled={isLoadingCredentials}
+                    className="w-full p-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-blue-500/50 rounded-lg text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <div className="font-medium text-white text-sm">
+                      {org.orgName || `Organization #${org.orgId}`}
+                    </div>
+                    <div className="font-mono text-xs text-gray-500 mt-1">
+                      ID: {org.orgId}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Credentials List Section */}
+      {encryptionPublicKey && selectedOrg && !holderSignature && !selectedCredential && (
+        <div className="mb-6 space-y-4">
+          <div className="p-4 bg-blue-900/30 border border-blue-700/50 rounded-lg">
+            <h3 className="text-sm font-semibold mb-3 text-white">Step 4: Select Your Credential</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Choose the credential you want to prove from {selectedOrg.orgName || `Organization #${selectedOrg.orgId}`}.
             </p>
             
             {isLoadingCredentials ? (
@@ -296,15 +433,22 @@ export default function ProveForm() {
               </div>
             ) : credentials.length === 0 ? (
               <div className="text-center py-8 bg-gray-800/50 rounded-lg">
-                <p className="text-gray-400">No credentials found for this encryption key.</p>
-                <p className="text-xs text-gray-500 mt-2">Make sure you have received credentials from an issuer.</p>
+                <p className="text-gray-400">No credentials found for this organization.</p>
+                <p className="text-xs text-gray-500 mt-2">Try selecting a different organization.</p>
               </div>
             ) : (
               <div className="space-y-2 max-h-96 overflow-y-auto">
                 {credentials.map((cred) => (
                   <button
                     key={cred.credentialId}
-                    onClick={() => fetchCredentialPackage(cred)}
+                    onClick={() => {
+                      setSelectedCredential(cred);
+                      setPackageJson('');
+                      setRevealKeys([]);
+                      setSelectedRevealKeys([]);
+                      setError(null);
+                      fetchCredentialPackage(cred);
+                    }}
                     disabled={isLoadingPackage}
                     className="w-full p-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-blue-500/50 rounded-lg text-left transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                   >
@@ -325,22 +469,27 @@ export default function ProveForm() {
               </div>
             )}
           </div>
+        </div>
+      )}
 
-          {selectedCredential && packageJson && (
-            <div className="p-4 bg-green-900/30 border border-green-700/50 rounded-lg">
-              <h3 className="text-sm font-semibold mb-3 text-white">Step 3: Sign Verification Nonce</h3>
-              <p className="text-xs text-gray-400 mb-3">
-                Sign a nonce with your encryption private key to prove ownership.
-              </p>
-              <button
-                onClick={handleSignNonce}
-                disabled={isSigning}
-                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
-              >
-                {isSigning ? 'Signing...' : 'Sign Nonce'}
-              </button>
-            </div>
-          )}
+      {encryptionPublicKey && selectedCredential && !holderSignature && (
+        <div className="mb-6">
+          <div className="p-4 bg-green-900/30 border border-green-700/50 rounded-lg">
+            <h3 className="text-sm font-semibold mb-3 text-white">Step 5: Sign Verification Nonce</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Sign a nonce with your encryption private key to prove ownership.
+            </p>
+            {isLoadingPackage ? (
+              <p className="text-xs text-gray-400 mb-3">Loading credential package…</p>
+            ) : null}
+            <button
+              onClick={handleSignNonce}
+              disabled={isSigning || isLoadingPackage || !packageJson}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
+            >
+              {isSigning ? 'Signing...' : 'Sign Nonce'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -351,7 +500,38 @@ export default function ProveForm() {
           </div>
 
           <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
-            <h3 className="text-sm font-semibold mb-3 text-white">Step 4: Review Credential Package</h3>
+            <h3 className="text-sm font-semibold mb-3 text-white">Select Attributes to Reveal</h3>
+            <p className="text-xs text-gray-400 mb-3">
+              Choose which attributes to include in your proof.
+            </p>
+            <div className="flex overflow-x-auto space-x-4 pb-2">
+              {revealKeys.map((attr) => (
+                <label key={attr} className="flex items-center space-x-2 whitespace-nowrap">
+                  <div className="relative">
+                    <input
+                      type="checkbox"
+                      checked={selectedRevealKeys.includes(attr)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setSelectedRevealKeys([...selectedRevealKeys, attr]);
+                        } else {
+                          setSelectedRevealKeys(selectedRevealKeys.filter(a => a !== attr));
+                        }
+                      }}
+                      className="appearance-none h-4 w-4 bg-gray-900 border border-gray-600 rounded checked:bg-blue-600 checked:border-blue-600 focus:ring-1 focus:ring-blue-500 focus:ring-offset-1 focus:ring-offset-gray-800"
+                    />
+                    {selectedRevealKeys.includes(attr) && (
+                      <span className="absolute inset-0 flex items-center justify-center text-white text-xs">✓</span>
+                    )}
+                  </div>
+                  <span className="text-sm text-gray-300">{attr}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div className="p-4 bg-gray-800/50 border border-gray-700 rounded-lg">
+            <h3 className="text-sm font-semibold mb-3 text-white">Step 6: Review Credential Package</h3>
             <textarea
               value={packageJson}
               onChange={(e) => setPackageJson(e.target.value)}
@@ -439,12 +619,7 @@ export default function ProveForm() {
               Copy to Clipboard
             </button> */}
             <button
-              onClick={() => {
-                setProofPackage(null);
-                setHolderSignature('');
-                setSelectedCredential(null);
-                setPackageJson('');
-              }}
+              onClick={resetAll}
               className="flex-1 bg-gray-600 text-white py-3 px-4 rounded-lg hover:bg-gray-700 font-medium transition-colors"
             >
               Generate New Proof

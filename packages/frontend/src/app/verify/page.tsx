@@ -7,7 +7,6 @@ import { StatusIndicator } from '@/components/StatusIndicator'
 import VerifyForm from '@/components/VerifyForm'
 import VerificationResultComponent from '@/components/VerificationResult'
 import { CompactVerificationPackage, VerificationResult } from '@/types/verification'
-import { removePubKeyPrefix } from '@/lib/utils'
 
 export default function VerifyPage() {
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null)

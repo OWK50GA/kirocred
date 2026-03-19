@@ -104,6 +104,43 @@ export class DatabaseClient {
   }
 
   /**
+   * Get organizations where a holder has credentials
+   */
+  async getOrganizationsByHolder(holder_address: string): Promise<Array<{ org_id: number; org_name: string | null }>> {
+    const query = `
+      SELECT DISTINCT o.org_id, o.org_name
+      FROM organizations o
+      JOIN batches b ON o.org_id = b.org_id
+      JOIN credentials c ON b.batch_id = c.batch_id
+      WHERE c.holder_address = $1
+      ORDER BY o.org_name
+    `;
+    const result = await this.pool.query(query, [holder_address]);
+    return result.rows;
+  }
+
+  /**
+   * Get credentials for a holder from a specific organization
+   */
+  async getCredentialsByHolderAndOrg(holder_address: string, org_id: number): Promise<Array<Credential & { org_id: number; org_name: string | null }>> {
+    const query = `
+      SELECT 
+        c.holder_address,
+        c.batch_id,
+        c.ipfs_cid,
+        c.credential_id,
+        b.org_id,
+        o.org_name
+      FROM credentials c
+      JOIN batches b ON c.batch_id = b.batch_id
+      JOIN organizations o ON b.org_id = o.org_id
+      WHERE c.holder_address = $1 AND b.org_id = $2
+    `;
+    const result = await this.pool.query(query, [holder_address, org_id]);
+    return result.rows;
+  }
+
+  /**
    * Get all credentials issued on Kirocred (for verifiers)
    * Returns credentials with org and batch info
    */
@@ -143,6 +180,48 @@ export class DatabaseClient {
       ORDER BY b.batch_id DESC
     `;
     const result = await this.pool.query(query);
+    return result.rows;
+  }
+
+  /**
+   * Get all organizations that have issued credentials (for verifiers)
+   * Returns organizations with credential count
+   */
+  async getAllOrganizations(): Promise<Array<{ org_id: number; org_name: string | null; credential_count: number }>> {
+    const query = `
+      SELECT
+        o.org_id,
+        o.org_name,
+        COUNT(c.credential_id) as credential_count
+      FROM organizations o
+      JOIN batches b ON o.org_id = b.org_id
+      LEFT JOIN credentials c ON b.batch_id = c.batch_id
+      GROUP BY o.org_id, o.org_name
+      ORDER BY o.org_name
+    `;
+    const result = await this.pool.query(query);
+    return result.rows;
+  }
+
+  /**
+   * Get all credentials issued by a specific organization (for verifiers)
+   * Returns credentials with batch info
+   */
+  async getCredentialsByOrg(org_id: number): Promise<Array<Credential & { batch_id: number; org_name: string | null }>> {
+    const query = `
+      SELECT
+        c.holder_address,
+        c.batch_id,
+        c.ipfs_cid,
+        c.credential_id,
+        o.org_name
+      FROM credentials c
+      JOIN batches b ON c.batch_id = b.batch_id
+      JOIN organizations o ON b.org_id = o.org_id
+      WHERE b.org_id = $1
+      ORDER BY c.batch_id DESC, c.credential_id
+    `;
+    const result = await this.pool.query(query, [org_id]);
     return result.rows;
   }
 

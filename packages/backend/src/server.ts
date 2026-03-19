@@ -22,6 +22,12 @@ async function main() {
       console.log("  POST /api/credentials/issue");
       console.log("  POST /api/batches/process");
       console.log("  POST /api/credentials/revoke");
+      console.log("  GET /api/organizations/holder/:address");
+      console.log("  GET /api/credentials/holder/:address/org/:orgId");
+      console.log("  GET /api/credentials/all");
+      console.log("  GET /api/batches/all");
+      console.log("  GET /api/organizations/all");
+      console.log("  GET /api/credentials/org/:orgId");
     });
 
     // Graceful shutdown

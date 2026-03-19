@@ -16,6 +16,12 @@ interface BatchInfo {
   credentialCount: number;
 }
 
+interface OrganizationInfo {
+  orgId: number;
+  orgName: string;
+  credentialCount: number;
+}
+
 export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
   const [packageJson, setPackageJson] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -25,25 +31,59 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
   const [showManualInput, setShowManualInput] = useState(false);
   const [activeTab, setActiveTab] = useState<'manual' | 'scan'>('manual');
   const [parsedPackage, setParsedPackage] = useState<any | null>(null);
+  const [organizations, setOrganizations] = useState<OrganizationInfo[]>([]);
+  const [isLoadingOrgs, setIsLoadingOrgs] = useState(false);
+  const [selectedOrg, setSelectedOrg] = useState<OrganizationInfo | null>(null);
+  const [showOrgBatches, setShowOrgBatches] = useState(false);
 
   // Fetch all batches on mount
   useEffect(() => {
-    fetchAllBatches();
+    // fetchAllBatches();
+    fetchAllOrganizations();
   }, []);
 
-  const fetchAllBatches = async () => {
+  const fetchAllOrganizations = async () => {
+    setIsLoadingOrgs(true);
+    setError(null);
+
+    try {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
+      const response = await fetch(`${backendUrl}/api/organizations/all`);
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch batches');
+      }
+
+      const data = await response.json();
+      
+      if (data.success) {
+        setOrganizations(data.organizations);
+      } else {
+        throw new Error(data.message || 'Failed to fetch batches');
+      }
+    } catch (err) {
+      console.error('Error fetching batches:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch batches');
+    } finally {
+      setIsLoadingOrgs(false);
+    }
+  }
+
+  const fetchAllBatches = async (org: OrganizationInfo) => {
     setIsLoadingBatches(true);
     setError(null);
 
     try {
       const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:3001';
-      const response = await fetch(`${backendUrl}/api/batches/all`);
+      const response = await fetch(`${backendUrl}/api/batches/orgs/${org.orgId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch batches');
       }
 
       const data = await response.json();
+
+      console.log(data);
       
       if (data.success) {
         setBatches(data.batches);
@@ -62,6 +102,11 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
     setSelectedBatch(batch);
     setShowManualInput(true);
   };
+
+  const handleOrgSelect = (org: OrganizationInfo) => {
+    setSelectedOrg(org);
+    fetchAllBatches(org);
+  }
 
   const handleQRResult = async (data: object | string) => {
     setError(null);
@@ -181,28 +226,71 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
             <p className="text-xs text-gray-400 mb-3">
               Choose from all credential batches issued on Kirocred
             </p>
-            
-            {isLoadingBatches ? (
+
+            {isLoading && (
               <div className="text-center py-8">
                 <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-                <p className="text-sm text-gray-400 mt-2">Loading batches...</p>
+                <p className="text-sm text-gray-400 mt-2">Loading organizations...</p>
               </div>
-            ) : batches.length === 0 ? (
+            )}
+
+            {!isLoadingOrgs && !selectedOrg && organizations.length === 0 && (
               <div className="text-center py-8 bg-gray-800/50 rounded-lg">
-                <p className="text-gray-400">No batches have been issued yet.</p>
-                <p className="text-xs text-gray-500 mt-2">Batches will appear here once issuers create them.</p>
+                <p className="text-gray-400">No organizations have been issued batches yet.</p>
+                <p className="text-xs text-gray-500 mt-2">Organizations will appear here once issuers create batches.</p>
               </div>
-            ) : (
+            )}
+
+            {!isLoadingOrgs && !selectedOrg && organizations.length > 0 && (
               <div className="space-y-2 max-h-96 overflow-y-auto">
-                {batches.map((batch) => (
+                {organizations.map((org) => (
                   <button
-                    key={batch.batchId}
-                    onClick={() => handleBatchSelect(batch)}
+                    key={org.orgId}
+                    onClick={() => handleOrgSelect(org)}
                     className="w-full p-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-blue-500/50 rounded-lg text-left transition-all"
                   >
                     <div className="flex justify-between items-start mb-2">
                       <div className="font-medium text-white text-sm">
-                        {batch.orgName || `Organization #${batch.orgId}`}
+                        {org.orgName || `Organization #${org.orgId}`}
+                      </div>
+                      {/* <div className="text-xs text-blue-400 font-medium">
+                        Batch #{batch.batchId}
+                      </div> */}
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <div className="text-xs text-gray-500">
+                        Org ID: {org.orgId}
+                      </div>
+                      <div className="text-xs text-gray-400">
+                        {org.credentialCount} credential{org.credentialCount !== 1 ? 's' : ''}
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* {!selectedOrg ? (
+              <div className="text-center py-8">
+                <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                <p className="text-sm text-gray-400 mt-2">Loading organizations...</p>
+              </div>
+            ) : organizations.length === 0 ? (
+              <div className="text-center py-8 bg-gray-800/50 rounded-lg">
+                <p className="text-gray-400">No organizations have been issued batches yet.</p>
+                <p className="text-xs text-gray-500 mt-2">Organizations will appear here once issuers create batches.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-96 overflow-y-auto">
+                {organizations.map((org) => (
+                  <button
+                    key={org.orgId}
+                    onClick={() => handleOrgSelect(org)}
+                    className="w-full p-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-blue-500/50 rounded-lg text-left transition-all"
+                  >
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="font-medium text-white text-sm">
+                        {org.orgName || `Organization #${org.orgId}`}
                       </div>
                       <div className="text-xs text-blue-400 font-medium">
                         Batch #{batch.batchId}
@@ -210,16 +298,68 @@ export default function VerifyForm({ onSubmit, isLoading }: VerifyFormProps) {
                     </div>
                     <div className="flex justify-between items-center">
                       <div className="text-xs text-gray-500">
-                        Org ID: {batch.orgId}
+                        Org ID: {org.orgId}
                       </div>
                       <div className="text-xs text-gray-400">
-                        {batch.credentialCount} credential{batch.credentialCount !== 1 ? 's' : ''}
+                        {org.credentialCount} credential{org.credentialCount !== 1 ? 's' : ''}
                       </div>
                     </div>
                   </button>
                 ))}
               </div>
+            )} */}
+
+            {selectedOrg && !selectedBatch && (
+              <div className="mb-6 space-y-4">
+                <div className="p-4 bg-blue-900/30 border border-blue-700/50 rounded-lg">
+                  <h3 className="text-sm font-semibold mb-3 text-white">Choose Batch You want to verify</h3>
+                  <p className="text-xs text-gray-400 mb-3">
+                    Choose the credential you want to prove from {selectedOrg.orgName || `Organization #${selectedOrg.orgId}`}.
+                  </p>
+                </div>
+
+                {isLoadingBatches ? (
+                  <div className="text-center py-8">
+                    <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    <p className="text-sm text-gray-400 mt-2">Loading batches...</p>
+                  </div>
+                ) : batches.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-800/50 rounded-lg">
+                    <p className="text-gray-400">No batches have been issued yet.</p>
+                    <p className="text-xs text-gray-500 mt-2">Batches will appear here once issuers create them.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-2 max-h-96 overflow-y-auto">
+                    {batches.map((batch) => (
+                      <button
+                        key={batch.batchId}
+                        onClick={() => handleBatchSelect(batch)}
+                        className="w-full p-4 bg-gray-800/50 hover:bg-gray-800 border border-gray-700 hover:border-blue-500/50 rounded-lg text-left transition-all"
+                      >
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="font-medium text-white text-sm">
+                            {batch.orgName || `Organization #${batch.orgId}`}
+                          </div>
+                          <div className="text-xs text-blue-400 font-medium">
+                            Batch #{batch.batchId}
+                          </div>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <div className="text-xs text-gray-500">
+                            Org ID: {batch.orgId}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {batch.credentialCount} credential{batch.credentialCount !== 1 ? 's' : ''}
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+              </div>
             )}
+            
           </div>
 
           <button
