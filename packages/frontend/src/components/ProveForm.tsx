@@ -274,9 +274,9 @@ export default function ProveForm() {
         )
 
         console.log(attributes);
-        const attrsKeys = selectedRevealKeys.length > 0 ? selectedRevealKeys : Object.keys(attributes);
+        selectedRevealKeys;
 
-        attrsKeys.forEach((key) => {
+        selectedRevealKeys.forEach((key) => {
           const value = attributes[key];
           if (value !== undefined) {
             parsedPackage["reveals"][key] = value;
